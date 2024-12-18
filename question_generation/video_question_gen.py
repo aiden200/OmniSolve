@@ -4,9 +4,9 @@ import time
 from prompts import *
 import json
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
-from dotenv import load_dotenv
+# from dotenv import load_dotenv
 
-load_dotenv()
+# load_dotenv()
 
 
 class VideoQuestionGenerator:
@@ -14,6 +14,7 @@ class VideoQuestionGenerator:
         self.model_name = model_name
         genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
         self.model = genai.GenerativeModel(model_name=model_name)
+        self.number = 0
 
 
     def _configure_video_file(self, video_path):
@@ -46,7 +47,7 @@ class VideoQuestionGenerator:
     
 
     def qa_over_part_video(self, video_path, start_time, end_time):
-        trimmed_video_path = "trimmed_video.mp4"
+        trimmed_video_path = f"trimmed_videos/trimmed_video{self.number}.mp4"
         ffmpeg_extract_subclip(video_path, start_time, end_time, outputfile=trimmed_video_path)
         video_file = self._configure_video_file(trimmed_video_path)
         self._check_process_video(video_file)
@@ -55,6 +56,8 @@ class VideoQuestionGenerator:
         response = self.model.generate_content([video_file, prompt],
                                     request_options={"timeout": 600})
         
+        self.parse_json_format(response.text, output_file=f"QA_trim_{self.number}")
+        self.number += 1
         return response.text
 
 
@@ -93,13 +96,13 @@ class VideoQuestionGenerator:
 
 
 
-processor = VideoQuestionGenerator()
-start_time = 1  # Start timestamp in seconds
-end_time = 10   # End timestamp in seconds
-video_url = "/home/aiden/Documents/cs/OmniSolve/depth_extraction/train_derailment_scene1/trimmed_output.mp4"
+# processor = VideoQuestionGenerator()
+# start_time = 1  # Start timestamp in seconds
+# end_time = 10   # End timestamp in seconds
+# video_url = "/home/aiden/Documents/cs/OmniSolve/depth_extraction/train_derailment_scene1/trimmed_output.mp4"
 
-response = processor.qa_over_part_video(video_url, start_time, end_time)
-print(response)
+# response = processor.qa_over_part_video(video_url, start_time, end_time)
+# print(response)
 
 
     
