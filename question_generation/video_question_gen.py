@@ -1,7 +1,7 @@
 import os
 import google.generativeai as genai
 import time
-from prompts import *
+from .prompts import *
 import json
 from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
 # from dotenv import load_dotenv
@@ -46,19 +46,26 @@ class VideoQuestionGenerator:
         return response.text
     
 
-    def qa_over_part_video(self, video_path, start_time, end_time):
-        trimmed_video_path = f"trimmed_videos/trimmed_video{self.number}.mp4"
-        ffmpeg_extract_subclip(video_path, start_time, end_time, outputfile=trimmed_video_path)
-        video_file = self._configure_video_file(trimmed_video_path)
+    def qa_over_part_video(self, video_path, start_time, end_time, vid_output_path, qa_output_path, text_output_path):
+        # trimmed_video_path = f"trimmed_videos/trimmed_video{self.number}.mp4"
+        ffmpeg_extract_subclip(video_path, start_time, end_time, outputfile=vid_output_path)
+        video_file = self._configure_video_file(vid_output_path)
         self._check_process_video(video_file)
 
         prompt = VIDEO_PROMPT
-        response = self.model.generate_content([video_file, prompt],
+        qa_response = self.model.generate_content([video_file, prompt],
                                     request_options={"timeout": 600})
         
-        self.parse_json_format(response.text, output_file=f"QA_trim_{self.number}")
-        self.number += 1
-        return response.text
+        
+        self.parse_json_format(qa_response.text, output_file=qa_output_path)
+        prompt = SUMMARY_VIDEO_PROMPT
+        text_response = self.model.generate_content([video_file, prompt],
+                                    request_options={"timeout": 600})
+        
+        with open(text_output_path, "w") as f:
+            f.write(text_response.text)
+        # self.number += 1
+        # return response.text
 
 
     def qa_over_timestamp_in_full_video(self, video_path, prompt_num=2):

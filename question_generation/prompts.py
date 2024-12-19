@@ -26,3 +26,9 @@ VIDEO_PROMPT2 = """
 Create some question answer pairs from the video. Make them broad and detailed,
 and only use the context from the video. Make sure to answer in a json format.
 """
+
+DEFAULT_MM_PROMPT = "What is happening in the video?"
+
+
+
+SUMMARY_VIDEO_PROMPT = "Write a detailed description of what is happening in this video. only respond in regular text, not markdown"
