@@ -71,7 +71,8 @@ pip install anthropic sentence-transformers nltk opencv-python-headless
 ### Environment Configuration
 Set up an environment variable for your API key:
 ```bash
-export CLAUDE_API_KEY="your-api-key"
+export CLAUDE_API_KEY=your-api-key
+export GOOGLE_API_KEY=your_api_key_here
 ```
 
 ---
@@ -105,19 +106,46 @@ print(questions)
 
 ```
 
-### 3. **Generating Video Evidence:**  
+### 3. **Generating Video Evidence (using the full video):**  
 ```python
-from question_generator import VideoEvidence
+from video_question_generator import VideoQuestionGenerator
 
-video_evidence = VideoEvidence(
-    id="e3", 
-    video_path="path/to/video.mp4",
-    metadata={"generated-description": "A flood devastated the region over several hours."}
+generator = VideoQuestionGenerator()
+
+video_path = "path/to/video.mp4"
+response = generator.qa_over_entire_video(video_path)
+
+print(response)  # Outputs generated questions and text summaries for the entire video.
+
+
+```
+
+### 4. **Generating Video Evidence (Processing Video Segments by Timestamp):**  
+```python
+from video_question_generator import VideoQuestionGenerator
+
+generator = VideoQuestionGenerator()
+
+video_path = "path/to/video.mp4"
+start_time = 10  # Start timestamp in seconds
+end_time = 20    # End timestamp in seconds
+
+vid_output_path = "path/to/output_segment.mp4"
+qa_output_path = "path/to/questions.json"
+text_output_path = "path/to/summary.txt"
+
+generator.qa_over_part_video(
+    video_path,
+    start_time,
+    end_time,
+    vid_output_path,
+    qa_output_path,
+    text_output_path
 )
-questions = generator.process_video_source(video_evidence)
 
-print(questions)
-
+print(f"Segment saved to {vid_output_path}")
+print(f"Questions saved to {qa_output_path}")
+print(f"Summary saved to {text_output_path}")
 ```
 ---
 
@@ -141,9 +169,16 @@ print(questions)
 
 ```json
 [
-    "How extensive was the damage?",
-    "How many emergency responders were present?"
+    {
+        "question": "What happened at the start of the video?",
+        "answer": "A train derailment occurred near the station."
+    },
+    {
+        "question": "What were the immediate consequences?",
+        "answer": "Several cars were overturned, spilling their contents."
+    }
 ]
+
 
 ```
 ### Multi-Hop Example  

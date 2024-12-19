@@ -48,7 +48,7 @@ class VideoQuestionGenerator:
 
     def qa_over_part_video(self, video_path, start_time, end_time, vid_output_path, qa_output_path, text_output_path):
         # trimmed_video_path = f"trimmed_videos/trimmed_video{self.number}.mp4"
-        ffmpeg_extract_subclip(video_path, start_time, end_time, outputfile=vid_output_path)
+        ffmpeg_extract_subclip(video_path, start_time, end_time, targetname=vid_output_path)
         video_file = self._configure_video_file(vid_output_path)
         self._check_process_video(video_file)
 

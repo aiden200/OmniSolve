@@ -12,12 +12,15 @@ class VideoParser:
         self.timestampExtracter = TimestampExtracter(prompt)
     
 
-    def extract_timestamps(self, video_url):
+    def split_and_generate_video(self, video_url):
+        if not os.path.exists(video_url):
+            raise ValueError("Video url doesn't exist")
         folder = "generated_data"
         filename = os.path.splitext(os.path.basename(video_url))[0]
         new_folder = os.path.join(folder, filename)
         counter = 0
         start_time = 0
+        
 
         if not os.path.exists(folder):
             os.mkdir(folder)
@@ -26,12 +29,28 @@ class VideoParser:
                             
         for timestamp, response, informative_score, relevance_score, frame, additional_info in self.timestampExtracter.start_chat(video_url):
             if response:
-                end_time = timestamp
+                end_time = timestamp - 1 # once the llm switched to a new scene its too late
+                print(f"Time {start_time} - {end_time}")
                 vid_output_file_path = f"{new_folder}/{counter}_video.mp4"
                 question_output_file_path = f"{new_folder}/{counter}_question.json"
                 text_output_file_path = f"{new_folder}/{counter}_description.text"
                 self.processor.qa_over_part_video(video_url, start_time, end_time, vid_output_file_path, question_output_file_path, text_output_file_path)
                 start_time = end_time + 1
+                counter += 1
+        
+        if end_time != timestamp:
+            start_time = end_time
+            end_time = timestamp
+            print(f"Time {start_time} - {end_time}")
+            vid_output_file_path = f"{new_folder}/{counter}_video.mp4"
+            question_output_file_path = f"{new_folder}/{counter}_question.json"
+            text_output_file_path = f"{new_folder}/{counter}_description.text"
+            self.processor.qa_over_part_video(video_url, start_time, end_time, vid_output_file_path, question_output_file_path, text_output_file_path)
+            start_time = end_time + 1
+            counter += 1
+    
+    def generate_over_entire_video(self, video_url):
+        pass
 
 
     
@@ -40,7 +59,8 @@ class VideoParser:
 
 parser = VideoParser()
 video_url = "/home/aiden/Documents/cs/OmniSolve/depth_extraction/train_derailment_scene1/trimmed_output.mp4"
-parser.extract_timestamps(video_url)
+video_url = "/home/aiden/Documents/cs/OmniSolve/question_generation/full_train_derailment.mp4"
+parser.split_and_generate_video(video_url)
 
 # start_time = 1  # Start timestamp in seconds
 # end_time = 10   # End timestamp in seconds
