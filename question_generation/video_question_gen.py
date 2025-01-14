@@ -14,6 +14,10 @@ class VideoQuestionGenerator:
         self.model_name = model_name
         genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
         self.model = genai.GenerativeModel(model_name=model_name)
+        self.summarize_model = genai.GenerativeModel(
+            model_name="gemini-1.5-pro", 
+            system_instruction="You are an expert summarizer. Your task is to generate a concise and coherent summary of the entire video based on the provided summaries of subclips. Ensure the summary reflects the key points and overall theme of the video."
+        )        
         self.number = 0
 
 
@@ -22,6 +26,13 @@ class VideoQuestionGenerator:
         video_file = genai.upload_file(path=video_path)
         print(f"Completed upload: {video_file.uri}")
         return video_file
+
+    def summarize_text(self, output_file, texts):
+
+        text_response = self.summarize_model.generate_content(texts)
+        
+        with open(output_file, "w") as f:
+            f.write(text_response.text)
 
 
     def _check_process_video(self, video_file):
@@ -46,27 +57,34 @@ class VideoQuestionGenerator:
         return response.text
     
 
-    def qa_over_part_video(self, video_path, start_time, end_time, vid_output_path, qa_output_path, text_output_path):
+    def qa_over_part_video(self, video_path, start_time, end_time, vid_output_path, text_output_path, qa_output_path = None, qa=False, prev_context=None):
         # trimmed_video_path = f"trimmed_videos/trimmed_video{self.number}.mp4"
         ffmpeg_extract_subclip(video_path, start_time, end_time, targetname=vid_output_path)
         video_file = self._configure_video_file(vid_output_path)
         self._check_process_video(video_file)
 
-        prompt = VIDEO_PROMPT
-        qa_response = self.model.generate_content([video_file, prompt],
-                                    request_options={"timeout": 600})
         
-        
-        self.parse_json_format(qa_response.text, output_file=qa_output_path)
         prompt = SUMMARY_VIDEO_PROMPT
+        if prev_context:
+            prompt = "Previously in the video, this had happened:"
+            for i in range(len(prev_context)):
+                prompt += f"{i+1}. {prev_context[i]}"
+            prompt += "Now, based on this, describe in detail what is happening in the current part of the video. Focus on key actions, events, and transitions. Respond in regular text, not markdown."
+        
         text_response = self.model.generate_content([video_file, prompt],
                                     request_options={"timeout": 600})
         
         with open(text_output_path, "w") as f:
             f.write(text_response.text)
         # self.number += 1
-        # return response.text
 
+        if qa:
+            prompt = VIDEO_PROMPT
+            qa_response = self.model.generate_content([video_file, prompt],
+                                        request_options={"timeout": 600})
+            self.parse_json_format(qa_response.text, output_file=qa_output_path)
+
+        return text_response.text
 
     def qa_over_timestamp_in_full_video(self, video_path, prompt_num=2):
         video_file = self._configure_video_file(video_path)

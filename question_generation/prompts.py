@@ -32,3 +32,5 @@ DEFAULT_MM_PROMPT = "What is happening in the video?"
 
 
 SUMMARY_VIDEO_PROMPT = "Write a detailed description of what is happening in this video. only respond in regular text, not markdown"
+
+SUMMARY_VIDEO_PROMPT_CONTEXT = "Write a detailed description of what is happening in this video. only respond in regular text, not markdown."
