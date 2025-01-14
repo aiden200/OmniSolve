@@ -1,225 +1,308 @@
-import streamlit as st
-import cv2
-import time
-import threading
-import queue
-from datetime import datetime
-from MMDuet.extract_timestamps import TimestampExtracter
+import os, torchvision, transformers, time
+import gradio as gr
+from threading import Event
+
+from MMDuet.models import parse_args
+from MMDuet.demo.liveinfer import LiveInferForDemo, load_video
 from question_generation.prompts import *
+logger = transformers.logging.get_logger('liveinfer')
 
-# -----------------------------------------
-# Placeholder for your real extractor class
-# -----------------------------------------
+# Predefined / internal parameters (hidden from the UI).
+args = parse_args('test')
+args.stream_end_prob_threshold = 0.3
+args.lora_pretrained = "MMDuet/outputs/mmduet"
+liveinfer = LiveInferForDemo(args)
 
+pause_event = Event()  # Event for pausing/resuming
+pause_event.set()      # Initially, processing is allowed (not paused)
 
-# Example usage of your snippet:
-# for timestamp, response, informative_score, relevance_score, frame, additional_info \
-#        in timestampExtracter.start_chat(video_url):
-#     if response:
-#         # do something ...
-#         pass
+css = """
+    #gr_title {text-align: center;}
+    #gr_video {max-height: 480px;}
+    #gr_chatbot {max-height: 480px;}
+"""
 
-timestampExtracter = TimestampExtracter(DEFAULT_MM_PROMPT)
+import cv2
 
-# -----------------------------------
-# Thread function to read the yields
-# -----------------------------------
-def run_timestamp_extractor(video_url, output_queue):
+# Utility function for frame display, if desired
+def display_frame(frame):
+    if frame is not None:
+        cv2.imshow("Frame", frame)
+        cv2.waitKey(1)  # Display the frame for 1 millisecond
+
+def update_messages(warnings, objectives_text, objectives_file):
     """
-    Continuously read from timestampExtracter.start_chat(video_url)
-    and store results in output_queue.
+    Update warnings and objectives from both text input and optional file upload.
     """
-    # Your “start_time”, “prev_context”, etc. might come from session state or real logic
-    start_time = 0
-    counter = 0
-    prev_context = []
-    qa = []  # Example placeholder
+    warnings_list = warnings.split("\n")
+    warnings_markdown = "\n".join(f"- {item}" for item in warnings_list if item.strip())
 
-    for timestamp, response, informative_score, relevance_score, frame, additional_info in timestampExtracter.start_chat(video_url):
-        # We'll just push everything to a queue so the main thread can handle it
-        output_queue.put((timestamp, response, informative_score, relevance_score, frame, additional_info))
-
-        # If your real logic wants to do something special when response is not empty:
-        if response:
-            end_time = timestamp - 1
-            # example of calling your own function
-            # ------------------------------------
-            # YOUR CODE HERE
-            # e.g.,
-            # vid_output_file_path = f"{new_folder}/{counter}_video.mp4"
-            # question_output_file_path = f"{new_folder}/{counter}_question.json"
-            # text_output_file_path = f"{new_folder}/{counter}_description.text"
-            #
-            # curr_context = self.video_processor.qa_over_part_video(
-            #     video_url,
-            #     start_time,
-            #     end_time,
-            #     vid_output_file_path,
-            #     question_output_file_path,
-            #     text_output_file_path,
-            #     qa=qa,
-            #     prev_context=prev_context
-            # )
-            # prev_context.append(curr_context)
-            # start_time = end_time + 1
-            # counter += 1
-            st.session_state["timestamps"].append(timestamp)
-            # For the example, let's just print something
-            # print(f"Detected response from {start_time} to {end_time}: {response}")
-
-# -----------------------
-# Streamlit UI
-# -----------------------
-def main():
-    st.title("Async Timestamp Extractor App")
-
-    # ------------------------
-    # Session State variables
-    # ------------------------
-    if "objectives" not in st.session_state:
-        st.session_state["objectives"] = "Enter your objectives here"
-    if "warnings" not in st.session_state:
-        st.session_state["warnings"] = "Enter your warnings here"
-    if "qa_pairs" not in st.session_state:
-        st.session_state["qa_pairs"] = []  # list of (question, answer)
-    if "timestamps" not in st.session_state:
-        st.session_state["timestamps"] = []
-    if "current_summary" not in st.session_state:
-        st.session_state["current_summary"] = "No summary yet"
-
-    # -------------
-    # Left Sidebar
-    # -------------
-    st.sidebar.header("Controls")
-    st.sidebar.write("Enter the video URL and manage Objectives/Warnings/Q&A")
-
-    # Input for video URL
-    video_url = st.sidebar.text_input("Video URL", value="question_generation/trimmed_video.mp4")
-
-    # Objectives & Warnings
-    st.sidebar.subheader("Edit Objectives")
-    new_objectives = st.sidebar.text_area("Objectives", value=st.session_state["objectives"])
-    if st.sidebar.button("Update Objectives"):
-        st.session_state["objectives"] = new_objectives
-
-    st.sidebar.subheader("Edit Warnings")
-    new_warnings = st.sidebar.text_area("Warnings", value=st.session_state["warnings"])
-    if st.sidebar.button("Update Warnings"):
-        st.session_state["warnings"] = new_warnings
-
-    st.sidebar.write("---")
-
-    # Q&A form
-    st.sidebar.subheader("Add Q&A")
-    q_input = st.sidebar.text_input("Question")
-    a_input = st.sidebar.text_input("Answer")
-    if st.sidebar.button("Add Q&A"):
-        if q_input and a_input:
-            st.session_state["qa_pairs"].append((q_input, a_input))
-        else:
-            st.warning("Please enter both question and answer")
-
-    # -------------
-    # Main Layout
-    # -------------
-    col1, col2 = st.columns([2, 1])
-    with col1:
-        st.subheader("Incoming Video Frames")
-        video_placeholder = st.empty()   # to display frames
-        result_placeholder = st.empty()  # to display textual info (response, scores, etc.)
-
-    with col2:
-        st.subheader("Dynamic Content")
-        st.markdown("**Timestamps**:")
-        st.write(st.session_state["timestamps"])
-        
-        st.markdown("**Current Summary**:")
-        st.write(st.session_state["current_summary"])
-
-    st.markdown("---")
-
-    col3, col4 = st.columns(2)
-    with col3:
-        st.subheader("Objectives")
-        st.write(st.session_state["objectives"])
-
-        st.subheader("Warnings")
-        st.write(st.session_state["warnings"])
-
-    with col4:
-        st.subheader("Q&A Log")
-        for idx, (q, a) in enumerate(st.session_state["qa_pairs"]):
-            st.write(f"**Q{idx+1}:** {q}")
-            st.write(f"**A{idx+1}:** {a}")
-            st.write("---")
-
-    # ------------------------------------
-    # Start/Stop the timestamp extraction
-    # ------------------------------------
-    if "stop_threads" not in st.session_state:
-        st.session_state["stop_threads"] = False
-    if "video_started" not in st.session_state:
-        st.session_state["video_started"] = False
-
-    def start_process():
-        st.session_state["stop_threads"] = False
-        st.session_state["video_started"] = True
-
-    def stop_process():
-        st.session_state["stop_threads"] = True
-        st.session_state["video_started"] = False
-
-    start_button = st.button("Start Extraction")
-    stop_button = st.button("Stop Extraction")
-
-    if start_button:
-        start_process()
-    if stop_button:
-        stop_process()
-
-    # We'll store incoming data from timestampExtracter in a queue
-    global_queue = queue.Queue()
-
-    if st.session_state["video_started"]:
-        # Launch the thread that runs start_chat and pushes data to global_queue
-        t = threading.Thread(target=run_timestamp_extractor, args=(video_url, global_queue), daemon=True)
-        t.start()
-
-        # Keep updating the UI while the thread runs
-        while True:
-            if st.session_state["stop_threads"]:
-                break
-
-            # Try to get new data from the queue
-            try:
-                timestamp, response, informative_score, relevance_score, frame, additional_info = global_queue.get(timeout=0.2)
-            except:
-                timestamp = None
-
-            if timestamp is not None:
-                # Convert to RGB for Streamlit
-                frame_rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                video_placeholder.image(frame_rgb, channels="RGB", caption=f"Timestamp: {timestamp}s")
-
-                # Display text-based info
-                display_text = (
-                    f"**Response**: {response}\n"
-                    f"**Informative Score**: {informative_score}\n"
-                    f"**Relevance Score**: {relevance_score}\n"
-                    f"**Additional Info**: {additional_info}"
-                )
-                result_placeholder.markdown(display_text)
-
-                # Optionally update summary
-                # e.g. st.session_state["current_summary"] = response or some ML logic
-                st.session_state["current_summary"] = f"Most recent response: {response}"
-
-            st.experimental_yield()
-
-        st.write("Extraction stopped.")
-
+    if objectives_file is not None:
+        # Handle uploaded file (assuming it contains text lines for objectives)
+        with open(objectives_file.name, "r") as f:
+            file_content = f.read()
+        file_obj_lines = [line.strip() for line in file_content.split("\n") if line.strip()]
+        # Combine any text-based objectives with file-based objectives
+        objectives_list = objectives_text.split("\n") + file_obj_lines
     else:
-        st.write("Click 'Start Extraction' to begin.")
+        objectives_list = objectives_text.split("\n")
 
-if __name__ == "__main__":
-    main()
+    # Remove empty lines
+    objectives_list = [obj.strip() for obj in objectives_list if obj.strip()]
+
+    return warnings_markdown, objectives_list
+
+class HistorySynchronizer:
+    def __init__(self):
+        self.history = []
+
+    def set_history(self, history):
+        self.history = history
+
+    def get_history(self):
+        return self.history
+
+    def reset(self):
+        self.history = []
+
+history_synchronizer = HistorySynchronizer()
+
+class ChatInterfaceWithUserMsgTime(gr.ChatInterface):
+    def __init__(self, type: str = "tuples", *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.type = type  # Initialize the `type` attribute
+
+    async def _display_input(self, message: str, history):
+        message = f"[time={liveinfer.video_time:.1f}s] {message}"
+        history = history_synchronizer.get_history()
+        if isinstance(message, str) and self.type == "tuples":
+            history.append([message, None])  # type: ignore
+        elif isinstance(message, str) and self.type == "messages":
+            history.append({"role": "user", "content": message})  # type: ignore
+        history_synchronizer.set_history(history)
+        return history  # type: ignore
+
+with gr.Blocks(title="Demo", css=css) as demo:
+    gr.Markdown("# Long Continuous Video Reasoning", elem_id='gr_title')
+    with gr.Row():
+        with gr.Column():
+            gr.Markdown(
+                """
+                ## IMPORTANT
+                1. **Objectives**: Brief bullet points that the model uses to focus its summaries.
+                2. **Warnings**: Items or objects of interest that the model should alert on if detected.
+                3. For demo clarity, there is a short artificial delay after each frame, so playback may seem slow.
+
+                If the app becomes unresponsive, you may need to restart.
+                """
+            )
+
+    # Hidden chat interface row (so we can still use a ChatInterface)
+    with gr.Row(visible=False):
+        def handle_user_input(message, history):
+            liveinfer.encode_given_query(message)
+        gr_chat_interface = ChatInterfaceWithUserMsgTime(
+            fn=handle_user_input,
+            chatbot=gr.Chatbot(
+                elem_id="gr_chatbot",
+                label="chatbot",
+                avatar_images=("demo/assets/user_avatar.png", "demo/assets/assistant_avatar.png"),
+                render=False
+            ),
+        )
+
+    with gr.Row(), gr.Blocks() as hyperparam_block:
+        # Video input
+        gr_video = gr.Video(
+            label="Input Video", 
+            visible=True, 
+            autoplay=False
+        )
+
+        with gr.Column():
+            # These parameters are internally set (below), so no UI is shown
+            hidden_thres_mode = gr.Textbox(value="sum score", visible=False)
+            hidden_threshold = gr.Slider(value=1.5, minimum=0, maximum=3, visible=False)
+            hidden_frame_interval = gr.Slider(value=2.0, minimum=0.1, maximum=10, visible=False)
+
+            # Default query (optional usage if needed)
+            gr_query = DEFAULT_MM_PROMPT
+
+            gr.Markdown("## Warnings and Objectives")
+
+            with gr.Row():
+                with gr.Column():
+                    gr.Markdown("### Warnings")
+                    warnings_list_display = gr.Markdown(label="Warnings List")
+                with gr.Column():
+                    gr.Markdown("### Objectives")
+                    objective_chatbox = gr.Chatbot(label="Objectives", height=200)
+
+            with gr.Row():
+                warnings_input = gr.Textbox(
+                    label="Add to Warnings", 
+                    placeholder="Type warnings here (one per line)..."
+                )
+                # Let user either type objectives or upload a file
+                objectives_input = gr.Textbox(
+                    label="Add to Objectives", 
+                    placeholder="Type objectives here (one per line)..."
+                )
+                objectives_file = gr.File(label="Upload Objectives file (optional)")
+
+            update_button = gr.Button("Update Lists")
+            update_button.click(
+                fn=update_messages, 
+                inputs=[warnings_input, objectives_input, objectives_file], 
+                outputs=[warnings_list_display, objective_chatbox],
+            )
+
+            # Button to start the analysis/chat
+            gr_start_button = gr.Button("Start Chat", variant="primary")
+
+        # Simplified examples: Just showing video and a possible prompt
+        gr_examples = gr.Examples(
+            examples=[
+                ["demo/assets/office.mp4", "Please summarize what is happening in the office?"],
+                ["demo/assets/drive.mp4", "Who is driving the car?"],
+                ["/home/aiden/Documents/cs/OmniSolve/question_generation/trimmed_video.mp4", "Please describe what you see."]
+            ],
+            inputs=[gr_video, gr_chat_interface.textbox],
+            label="Examples"
+        )
+
+    with gr.Row() as chat:
+        with gr.Column():
+            gr_frame_display = gr.Image(label="Current Model Input Frame", interactive=False)
+            with gr.Row():
+                gr_time_display = gr.Number(label="Current Video Time", value=0)
+            with gr.Row():
+                gr_inf_score_display = gr.Number(label="Informative Score", value=0)
+                gr_rel_score_display = gr.Number(label="Relevance Score", value=0)
+
+            with gr.Row():
+                gr_pause_button = gr.Button("Pause Video")
+                gr_stop_button = gr.Button("Stop Video", variant='stop')
+
+        with gr.Column():
+            gr_chat_interface.render()
+
+    def start_chat(src_video_path, thres_mode, threshold, frame_interval, history):
+        """
+        Runs the main loop, pulling frames, generating responses, and yielding to UI.
+        """
+        # Clear the chatbot and frame display
+        yield 0, 0, 0, None, []
+
+        # Set the hyperparameters (internally)
+        liveinfer.reset()
+        history_synchronizer.reset()
+        # We define which score heads to use (internally).
+        liveinfer.score_heads = ["informative_score", "relevance_score"]
+
+        # Apply thresholds from hidden inputs
+        if thres_mode == "single-frame score":
+            liveinfer.stream_end_prob_threshold = threshold
+            liveinfer.stream_end_score_sum_threshold = None
+        elif thres_mode == "sum score":
+            liveinfer.stream_end_prob_threshold = None
+            liveinfer.stream_end_score_sum_threshold = threshold
+
+        # Setup frames-per-second
+        frame_fps = 1 / frame_interval
+        liveinfer.set_fps(frame_fps)
+
+        # Load the video
+        video_input, original_frame_list = load_video(src_video_path, frame_fps)
+        liveinfer.input_video_stream(video_input)
+
+        # Disable parameter editing while video is running
+        for component in hyperparam_block.children:
+            component.interactive = False
+
+        # Main video loop
+        while liveinfer.frame_embeds_queue:
+            start_time = time.time()
+            # Wait if pause was pressed
+            pause_event.wait()
+
+            ret = liveinfer.input_one_frame()
+            history = history_synchronizer.get_history()
+
+            if ret['response'] is not None:
+                frame_idx = ret['frame_idx']
+                if 0 <= frame_idx < len(original_frame_list):
+                    frame = original_frame_list[frame_idx]
+
+                history.append((None, f"[time={ret['time']}s] {ret['response']}"))
+                history_synchronizer.set_history(history)
+
+            elapsed_time = time.time() - start_time
+            target_delay_time = min(frame_interval, 0.2)
+            if elapsed_time < target_delay_time:
+                time.sleep(frame_interval - elapsed_time)
+
+            yield (
+                ret['time'],
+                ret['informative_score'],
+                ret['relevance_score'],
+                original_frame_list[ret['frame_idx'] - 1],
+                history
+            )
+
+    gr_start_button.click(
+        fn=start_chat,
+        inputs=[
+            gr_video, 
+            hidden_thres_mode, 
+            hidden_threshold, 
+            hidden_frame_interval, 
+            gr_chat_interface.chatbot
+        ],
+        outputs=[
+            gr_time_display,
+            gr_inf_score_display,
+            gr_rel_score_display,
+            gr_frame_display,
+            gr_chat_interface.chatbot
+        ]
+    )
+
+    def toggle_pause():
+        if pause_event.is_set():
+            pause_event.clear()  # Pause processing
+            return "Resume Video"
+        else:
+            pause_event.set()    # Resume processing
+            return "Pause Video"
+
+    gr_pause_button.click(
+        toggle_pause,
+        inputs=[],
+        outputs=gr_pause_button
+    )
+
+    def stop_chat():
+        liveinfer.reset()
+        history_synchronizer.reset()
+
+        # Re-enable the hidden param block
+        for component in hyperparam_block.children:
+            component.interactive = True
+
+        return 0, 0, 0, None, []
+
+    gr_stop_button.click(
+        stop_chat,
+        inputs=[],
+        outputs=[
+            gr_time_display,
+            gr_inf_score_display,
+            gr_rel_score_display,
+            gr_frame_display,
+            gr_chat_interface.chatbot
+        ]
+    )
+
+    demo.queue()
+    demo.launch(share=False)
