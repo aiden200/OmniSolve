@@ -7,6 +7,8 @@ import math
 from metadata_rag.test_data import *
 from collections import defaultdict
 import matplotlib.pyplot as plt
+from concurrent.futures import ThreadPoolExecutor
+
 
 
 
@@ -14,7 +16,7 @@ import matplotlib.pyplot as plt
 class Information_processor:
     def __init__(self, warnings, objectives, working_dir="temp"):
         self.status_report_messages = []
-        self.world_beliefs = []
+        self.long_term_memory = ""
         self.warnings = warnings
         self.objectives = objectives
         self.summary = ""
@@ -27,9 +29,8 @@ class Information_processor:
         status_report_sheet = os.path.join(self.working_dir, "status_report_sheet.txt")
 
         with open(world_belief_sheet, 'w') as f:
-            f.write("World Beliefs\n")
-            for line in self.world_beliefs:
-                f.write(f"{line}\n")
+            f.write("Long Term Memory\n")
+            f.write(f"{self.long_term_memory}\n")
         
         with open(status_report_sheet, 'w') as f:
             f.write("Status Reports\n")
@@ -48,22 +49,54 @@ class Information_processor:
             print("Markers not found in the text.")
             return None
     
-    def update_summary(self, new_information): # we could benchmark this to multivent
-        
+    def _update_summary(self, new_information): # we could benchmark this to multivent
         prompt = f"You are tasked with maintaining a concise summary of an ongoing event. The current summary is: {self.summary}.\
-            The new information provided is: {new_information}. Determine if this new information significantly changes or adds to the current summary. If so,\
+            The new information provided is: {new_information}. Given the objectives: {str(self.objectives)} and warnings: {str(self.warnings)}, Determine if this new information significantly changes or adds to the current summary. If so,\
                 write a new, updated summary within one short paragraph. If the new information does not affect the summary, reply with '__NONE__'."
         response = self.model.generate_content(prompt)
         if "__NONE__" not in response.text:
             self.summary = response.text
     
-    def status_report(self, new_information, timestamp):
+    def _status_report(self, new_information, timestamp):
         prompt = f"You are tasked with a one sentence status report. The current status reports are: {str(self.status_report_messages)}.\
-            The new information provided is: {new_information}. Write a one sentence status report given the \
+            The new information provided is: {new_information}. Given the objectives: {str(self.objectives)} and warnings: {str(self.warnings)}, Write a one sentence status report given the \
                 timestamp: {timestamp}, in the format [TIMESTAMP]: [STATUS REPORT]"
         response = self.model.generate_content(prompt)
         self.status_report_messages.append(response.text)
     
+
+    def _update_long_term_memory(self, new_information, new_object_information): # this might not actually add any value. we'll see
+        prompt = (
+            f"You are tasked with maintaining a concise set of world facts. The current long-term memory is: {str(self.long_term_memory)}. \
+            The new information provided is: {new_information}. The new object relationships provided are: {new_object_information}. \
+            Given the objectives: {str(self.objectives)} and warnings: {str(self.warnings)}, refine the long-term memory. \
+            Ensure it aligns with the objectives, detects the warnings, and remains concise. Write the updated long-term memory."
+        )
+        response = self.model.generate_content(prompt)
+        self.long_term_memory = response.text
+
+    
+    def execute_parallel_updates(self, new_information, timestamp, new_object_information):
+        """
+        Executes update_summary, status_report, and update_long_term_memory in parallel.
+        
+        Parameters:
+            new_information (str): New information to process.
+            timestamp (str): The timestamp for the status report.
+            new_object_information (str): Additional object-related information for long-term memory.
+        
+        Returns:
+            None
+        """
+        with ThreadPoolExecutor() as executor:
+            
+            future_update_summary = executor.submit(self._update_summary, new_information)
+            future_status_report = executor.submit(self._status_report, new_information, timestamp)
+            future_update_long_term_memory = executor.submit(self._update_long_term_memory, new_information, new_object_information)
+            
+            
+            for future in [future_update_summary, future_status_report, future_update_long_term_memory]:
+                future.result() 
 
     
 
