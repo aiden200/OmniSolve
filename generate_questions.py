@@ -1,7 +1,7 @@
 from dotenv import load_dotenv
 import os, shutil
 from question_generation.video_question_gen import VideoQuestionGenerator
-# from MMDuet.extract_timestamps import TimestampExtracter
+from MMDuet.extract_timestamps import TimestampExtracter
 from metadata_rag.information_processor import Information_processor 
 from question_generation.prompts import *
 
