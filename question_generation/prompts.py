@@ -27,7 +27,7 @@ Create some question answer pairs from the video. Make them broad and detailed,
 and only use the context from the video. Make sure to answer in a json format.
 """
 
-DEFAULT_MM_PROMPT = "What is happening in the video?"
+DEFAULT_MM_PROMPT = "Describe what is happening in the video"
 
 
 

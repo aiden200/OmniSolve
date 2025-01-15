@@ -10,13 +10,13 @@ load_dotenv()
 
 class VideoParser:
     def __init__(self, prompt=DEFAULT_MM_PROMPT, load_timestamp_processer=True, warnings=[], objectives=[], working_dir="temp"):
-        # self.video_processor = VideoQuestionGenerator()
+        self.video_processor = VideoQuestionGenerator()
         self.information_processor = Information_processor(warnings, objectives, working_dir)
         if os.path.exists(working_dir):
             shutil.rmtree(working_dir)
         os.mkdir(working_dir)
-        # if load_timestamp_processer:
-        #     self.timestampExtracter = TimestampExtracter(prompt)
+        if load_timestamp_processer:
+            self.timestampExtracter = TimestampExtracter(prompt)
 
     
     def summarize_video_given_text(self, output_file, texts):

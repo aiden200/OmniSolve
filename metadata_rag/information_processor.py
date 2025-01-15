@@ -21,21 +21,12 @@ class Information_processor:
         self.objectives = objectives
         self.summary = ""
         self.working_dir = working_dir
+        self.long_term_memory_file = os.path.join(working_dir, "long_term_memory.txt")
+        self.status_report_file = os.path.join(working_dir, "status_reports.txt")
+        self.summary_file = os.path.join(working_dir, "summary.txt")
         genai.configure(api_key=os.environ['GOOGLE_API_KEY'])
         self.model = genai.GenerativeModel(model_name="gemini-1.5-flash")
 
-    def write_facts_and_beliefs_to_disk(self):
-        world_belief_sheet = os.path.join(self.working_dir, "factual_sheet.txt")
-        status_report_sheet = os.path.join(self.working_dir, "status_report_sheet.txt")
-
-        with open(world_belief_sheet, 'w') as f:
-            f.write("Long Term Memory\n")
-            f.write(f"{self.long_term_memory}\n")
-        
-        with open(status_report_sheet, 'w') as f:
-            f.write("Status Reports\n")
-            for line in self.status_report_messages:
-                f.write(f"{line}\n")
 
     def _extract_json_between_markers(self, text, start_marker="```json", end_marker="```"):
         try:
@@ -56,13 +47,18 @@ class Information_processor:
         response = self.model.generate_content(prompt)
         if "__NONE__" not in response.text:
             self.summary = response.text
+            with open(self.summary_file, "w") as f:
+                f.write(self.summary)
     
     def _status_report(self, new_information, timestamp):
         prompt = f"You are tasked with a one sentence status report. The current status reports are: {str(self.status_report_messages)}.\
             The new information provided is: {new_information}. Given the objectives: {str(self.objectives)} and warnings: {str(self.warnings)}, Write a one sentence status report given the \
-                timestamp: {timestamp}, in the format [TIMESTAMP]: [STATUS REPORT]"
+                timestamp: {timestamp}, in the format [TIMESTAMP]: [STATUS REPORT]. only return the newest status report, ignore any old ones"
         response = self.model.generate_content(prompt)
         self.status_report_messages.append(response.text)
+        with open(self.status_report_file, "a") as f:
+            f.write(response.text + "\n")
+
     
 
     def _update_long_term_memory(self, new_information, new_object_information): # this might not actually add any value. we'll see
@@ -74,6 +70,8 @@ class Information_processor:
         )
         response = self.model.generate_content(prompt)
         self.long_term_memory = response.text
+        with open(self.long_term_memory_file, "w") as f:
+            f.write(self.long_term_memory)
 
     
     def execute_parallel_updates(self, new_information, timestamp, new_object_information):
