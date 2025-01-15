@@ -22,24 +22,26 @@ load_dotenv()
 
 
 class VectorPopulatorWorker:
-    def __init__(self, vector_db, information_processor: Information_processor, ):
-        self.vector_db = vector_db
+    def __init__(self, vector_db, information_processor: Information_processor, video_question_generator: VideoQuestionGenerator):
+
         self.task_queue = Queue()
         self.stop_event = threading.Event()
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.task_num = 0
         self.thread.start()
         self.information_processor = information_processor
+        self.video_question_generator = video_question_generator
+        self.prev_context = []
 
-    def add_task(self, text_to_embed, timestamp):
+    def add_task(self, video_url, start_time, end_time, vid_output_file_path, text_output_file_path):
         """Add a text chunk to the queue for embedding."""
-        self.task_queue.put([text_to_embed, timestamp])
+        self.task_queue.put([video_url, start_time, end_time, vid_output_file_path, text_output_file_path])
 
     def _run(self):
         """Continuously process tasks from the queue."""
         while not self.stop_event.is_set():
             try:
-                [text_to_embed, timestamp] = self.task_queue.get(timeout=1)
+                [video_url, start_time, end_time, vid_output_file_path, text_output_file_path] = self.task_queue.get(timeout=1)
             except:
                 # If queue is empty for a while, loop back to check stop_event
                 continue
@@ -47,9 +49,35 @@ class VectorPopulatorWorker:
             # Now embed + insert into vector DB
             try:
                 # This might be expensive and take a while
-                log.info(f"Vector population for task {self.task_num} for timestamp {timestamp} started.")
-                ## TODO: Implement logic here
-                self.vector_db.insert_text(text_to_embed) 
+                log.info(f"Vector population for task {self.task_num} for timestamp {start_time} started.")
+
+                curr_context = self.video_question_generator.qa_over_part_video(
+                    video_url, start_time, end_time,
+                    vid_output_file_path, text_output_file_path,
+                    prev_context=self.prev_context
+                )
+                self.prev_context.append(curr_context) 
+
+                # Populate the regular vector DB
+
+                # Get objects from dense captioning
+                new_object_information = get_objects
+                
+                # Populate the object vector DB
+                
+                # Extract Important clips
+                 
+                # Obtain the depth  
+
+                # Populate the 3D SG
+
+                # 
+
+                # update the texts
+                self.information_processor.execute_parallel_updates(curr_context, f'{start_time - end_time}', new_object_information)
+
+
+
             except Exception as e:
                 print(f"Vector population error: {e}")
                 log.info(f"ERROR: Vector population error for {self.task_num} with error: {e}")
@@ -78,6 +106,7 @@ class RealTimeVideoProcess:
         self.timestampExtracter = timestamp_extractor
         self.video_question_generator = video_question_generator
         self.working_dir = working_dir
+        self.vector_population_worker = VectorPopulatorWorker(information_processor=information_processor, video_question_generator=video_question_generator)
 
     def real_time_video_process(self, video_url, output_dir):
         if not os.path.exists(video_url):
@@ -87,7 +116,6 @@ class RealTimeVideoProcess:
         start_time = 0
         end_time = 0
 
-        prev_context = []
 
         for timestamp, response, informative_score, relevance_score, frame, additional_info in self.timestampExtracter.start_chat(video_url):
             if frame is not None:
@@ -103,19 +131,7 @@ class RealTimeVideoProcess:
                 vid_output_file_path = os.path.join(output_dir, f"{counter}.mp4")
                 text_output_file_path = os.path.join(output_dir, f"{counter}.txt")
 
-                # Actually process the chunk
-                curr_context = self.video_question_generator.qa_over_part_video(
-                    video_url, start_time, end_time,
-                    vid_output_file_path, text_output_file_path,
-                    prev_context=prev_context
-                )
-                prev_context.append(curr_context)
-
-                # -----------------------------------------------
-                # PARALLEL: populate vector DB with 'curr_context'
-                # -----------------------------------------------
-                # In a real scenario, do embedding => store in DB
-                self.vector_db.insert_text(curr_context)
+                self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path)
 
                 start_time = end_time + 1
                 counter += 1
@@ -127,13 +143,7 @@ class RealTimeVideoProcess:
             vid_output_file_path = os.path.join(output_dir, f"{counter}.mp4")
             text_output_file_path = os.path.join(output_dir, f"{counter}.txt")
 
-            curr_context = self.video_processor.qa_over_part_video(
-                video_url, start_time, end_time,
-                vid_output_file_path, text_output_file_path,
-                prev_context=prev_context
-            )
-            self.vector_db.insert_text(curr_context)
-            prev_context.append(curr_context)
+            self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path)
 
             start_time = end_time + 1
             counter += 1
@@ -269,7 +279,17 @@ def query_vector_db():
 
     question = data['question']
 
-    # For demonstration, we just return the top-1 match
+    # Get data from regular summarization RAG
+
+    # Get the specific video clips associated and the respective entropy frames (just the paths)
+
+    # Get the KG Rag and the specific entity relationships (maybe have a UI for this)
+
+    # Use this to generate a comprehensive answer and return this to the user, along with the evidence.
+
+    # I need a simple UI on the other side of the process to be able to handle this.
+
+    # Need to fix this 
     results = INFORMATION_PROCESSOR.query(question, top_k=1)
     if results:
         # Return the text from the best match
