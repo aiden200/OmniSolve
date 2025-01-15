@@ -17,7 +17,10 @@ from metadata_rag.vqa_rag import RAGSystem
 from question_generation.prompts import *
 import logging
 
+
 log_file_path = "app.log"
+if os.path.exists(log_file_path):
+    os.remove(log_file_path)
 
 logging.basicConfig(
     level=logging.INFO,  # or logging.INFO for less verbosity
@@ -25,6 +28,7 @@ logging.basicConfig(
     datefmt='%Y-%m-%d %H:%M:%S',
     handlers=[logging.FileHandler(log_file_path)]
 )
+
 
 log = logging.getLogger(__name__)
 
@@ -75,7 +79,7 @@ class VectorPopulatorWorker:
                 self.prev_context.append(current_video_description) 
 
                 # Get objects from dense captioning & Extract Important clips TODO: Paralize 
-                new_object_information = self.information_processor.update_respective_information()
+                new_object_information = self.information_processor.update_respective_information(vid_output_file_path)
 
                 # Populate the regular vector DB & match any alerts from Objectives or warnings
                 self.rag.add_to_rag(current_video_description, vid_id)
@@ -143,13 +147,14 @@ class RealTimeVideoProcess:
 
 
         for timestamp, response, informative_score, relevance_score, frame, additional_info in self.timestampExtracter.start_chat(video_url):
-            if frame is not None:
-                cv2.imshow("Debug Video Playback", frame)
+            # print("frame is in")
+            # if frame is not None:
+            #     cv2.imshow("Debug Video Playback", frame)
                 # A waitKey of ~30 ms matches ~30fps. Adjust as needed.
                 # If user presses 'q', we'll exit the loop.
-                if cv2.waitKey(30) & 0xFF == ord('q'):
-                    print("User requested exit from debug video window.")
-                    break
+                # if cv2.waitKey(30) & 0xFF == ord('q'):
+                #     print("User requested exit from debug video window.")
+                #     break
             
             if response:
                 end_time = timestamp - 1  # once the llm switched to a new scene it's too late
@@ -173,7 +178,7 @@ class RealTimeVideoProcess:
             start_time = end_time + 1
             counter += 1
         
-        cv2.destroyAllWindows()
+        # cv2.destroyAllWindows()
 
 
 # ----------------------------------
@@ -231,7 +236,7 @@ def upload_video():
 
     with open(STORE_WARNINGS_FILE, "w") as f:
         for line in warnings:
-            f.write(line)
+            f.write(line + "\n")
 
 
     RAG_SYSTEM = RAGSystem(db_dir=DB_DIR)

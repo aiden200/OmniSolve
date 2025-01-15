@@ -119,7 +119,7 @@ class Information_processor:
         """Select the top N frames based on entropy."""
         
         frame_entropies = {
-            frame_id-1: self.calculate_entropy(video_data["frames"][frame_id]) # -1 for the 0 index
+            frame_id: self.calculate_entropy(video_data["frames"][frame_id]) # -1 for the 0 index
             for frame_id in video_data["frames"]
             
         }
@@ -136,22 +136,42 @@ class Information_processor:
 
         # Create a mapping of object names to their center points
         object_centers = {}
+        overlapping_names = {}
 
         for obj in frame_data["objects"]:
             bbox = obj["bbox"]
             name = obj["name"]
 
-            ymin = int((bbox[0] / 1000) * height)
-            xmin = int((bbox[1] / 1000) * width)
-            ymax = int((bbox[2] / 1000) * height)
-            xmax = int((bbox[3] / 1000) * width)
+            # ymin = int((bbox[0] / 1000) * height)
+            # xmin = int((bbox[1] / 1000) * width)
+            # ymax = int((bbox[2] / 1000) * height)
+            # xmax = int((bbox[3] / 1000) * width)
 
-            center_x = (xmin + xmax) // 2
-            center_y = (ymin + ymax) // 2
+            # center_x = (xmin + xmax) // 2
+            # center_y = (ymin + ymax) // 2
+            # object_centers[name] = (center_x, center_y)
+
+            # cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
+            # cv2.putText(image, name, (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+
+            ymin, xmin, ymax, xmax = bbox
+            x1 = int(xmin / 1000 * width)
+            y1 = int(ymin / 1000 * height)
+            x2 = int(xmax / 1000 * width)
+            y2 = int(ymax / 1000 * height)
+
+            center_x = (x1 + x2) // 2
+            center_y = (y1 + y2) // 2
+
+            if name in object_centers:
+                count = overlapping_names.get(name, 0)
+                name = f"{name}_{count}"
+                overlapping_names[name] += 1
             object_centers[name] = (center_x, center_y)
+            
+            cv2.putText(image, name, (x1+2, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+            cv2.rectangle(image, (x1, y1), (x2, y2), (0, 255, 0), 2)
 
-            cv2.rectangle(image, (xmin, ymin), (xmax, ymax), (0, 255, 0), 2)
-            cv2.putText(image, name, (xmin, ymin - 10), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
 
         for rel in frame_data["relationships"]:
             obj1 = rel["object_1"]
@@ -226,7 +246,7 @@ class Information_processor:
         for frame_num in key_frames:
             frame = frames[frame_num]
             output_name = f"{video_path[:-4]}_{i}.jpg"
-            self.draw_bounding_boxes(parsed_data["frames"][frame_num+1], frame, output_name)
+            self.draw_bounding_boxes(parsed_data["frames"][frame_num], frame, output_name)
             i += 1
 
         return parsed_data
