@@ -8,13 +8,25 @@ import os, shutil
 from queue import Queue
 import cv2
 
+from config import *
 from question_generation.video_question_gen import VideoQuestionGenerator
 from MMDuet.extract_timestamps import TimestampExtracter
+from depth_extraction.extract_depth import DepthCalculator
 from metadata_rag.information_processor import Information_processor 
+from metadata_rag.vqa_rag import RAGSystem
 from question_generation.prompts import *
 import logging
 
+log_file_path = "app.log"
 
+logging.basicConfig(
+    level=logging.INFO,  # or logging.INFO for less verbosity
+    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
+    datefmt='%Y-%m-%d %H:%M:%S',
+    handlers=[logging.FileHandler(log_file_path)]
+)
+
+log = logging.getLogger(__name__)
 
 
 load_dotenv()
@@ -22,10 +34,11 @@ load_dotenv()
 
 
 class VectorPopulatorWorker:
-    def __init__(self, vector_db, information_processor: Information_processor, video_question_generator: VideoQuestionGenerator):
-
+    def __init__(self, rag_system: RAGSystem, information_processor: Information_processor, video_question_generator: VideoQuestionGenerator):
+        # self.dpt = DepthCalculator()
         self.task_queue = Queue()
         self.stop_event = threading.Event()
+        self.rag = rag_system
         self.thread = threading.Thread(target=self._run, daemon=True)
         self.task_num = 0
         self.thread.start()
@@ -33,15 +46,15 @@ class VectorPopulatorWorker:
         self.video_question_generator = video_question_generator
         self.prev_context = []
 
-    def add_task(self, video_url, start_time, end_time, vid_output_file_path, text_output_file_path):
+    def add_task(self, video_url, start_time, end_time, vid_output_file_path, text_output_file_path, vid_id):
         """Add a text chunk to the queue for embedding."""
-        self.task_queue.put([video_url, start_time, end_time, vid_output_file_path, text_output_file_path])
+        self.task_queue.put([video_url, start_time, end_time, vid_output_file_path, text_output_file_path, vid_id])
 
     def _run(self):
         """Continuously process tasks from the queue."""
         while not self.stop_event.is_set():
             try:
-                [video_url, start_time, end_time, vid_output_file_path, text_output_file_path] = self.task_queue.get(timeout=1)
+                [video_url, start_time, end_time, vid_output_file_path, text_output_file_path, vid_id] = self.task_queue.get(timeout=1)
             except:
                 # If queue is empty for a while, loop back to check stop_event
                 continue
@@ -50,31 +63,42 @@ class VectorPopulatorWorker:
             try:
                 # This might be expensive and take a while
                 log.info(f"Vector population for task {self.task_num} for timestamp {start_time} started.")
+                objectives_updates, warnings_updates = None, None
 
-                curr_context = self.video_question_generator.qa_over_part_video(
+
+                current_video_description = self.video_question_generator.qa_over_part_video(
                     video_url, start_time, end_time,
                     vid_output_file_path, text_output_file_path,
                     prev_context=self.prev_context
                 )
-                self.prev_context.append(curr_context) 
 
-                # Populate the regular vector DB
+                self.prev_context.append(current_video_description) 
 
-                # Get objects from dense captioning
-                new_object_information = get_objects
+                # Get objects from dense captioning & Extract Important clips TODO: Paralize 
+                new_object_information = self.information_processor.update_respective_information()
+
+                # Populate the regular vector DB & match any alerts from Objectives or warnings
+                self.rag.add_to_rag(current_video_description, vid_id)
                 
-                # Populate the object vector DB
+                # TODO: Populate the object KG
+                # self.rag.add_to_kg(new_object_information, vid_id)
+
                 
-                # Extract Important clips
-                 
-                # Obtain the depth  
+                # TODO: Done - Obtain the depth 
+                # depth_output_path = f"{vid_output_file_path[:-4]}_d.mp4"
+                # self.dpt.extract_video_depth(vid_output_file_path, depth_output_path)
 
-                # Populate the 3D SG
+                # TODO: Populate the 3D SG
 
-                # 
 
                 # update the texts
-                self.information_processor.execute_parallel_updates(curr_context, f'{start_time - end_time}', new_object_information)
+                self.information_processor.execute_parallel_updates(
+                    current_video_description, 
+                    f'{start_time} - {end_time}', 
+                    new_object_information,
+                    objectives_updates,
+                    warnings_updates
+                    )
 
 
 
@@ -100,17 +124,18 @@ class RealTimeVideoProcess:
     Your main orchestrator that processes the video chunk by chunk,
     storing text data in the vector DB as soon as it appears.
     """
-    def __init__(self, information_processor: Information_processor, timestamp_extractor: TimestampExtracter, video_question_generator: VideoQuestionGenerator, working_dir):
-
-        self.information_processor = information_processor
+    def __init__(self, rag_system: RAGSystem, information_processor: Information_processor, timestamp_extractor: TimestampExtracter, video_question_generator: VideoQuestionGenerator, working_dir):
+        self.rag = rag_system
         self.timestampExtracter = timestamp_extractor
-        self.video_question_generator = video_question_generator
         self.working_dir = working_dir
-        self.vector_population_worker = VectorPopulatorWorker(information_processor=information_processor, video_question_generator=video_question_generator)
+        self.vector_population_worker = VectorPopulatorWorker(rag_system=rag_system, information_processor=information_processor, video_question_generator=video_question_generator)
+        
 
     def real_time_video_process(self, video_url, output_dir):
         if not os.path.exists(video_url):
             raise ValueError("Video url doesn't exist")
+        
+        log.info("Starting real time video process")
         
         counter = 0
         start_time = 0
@@ -131,7 +156,7 @@ class RealTimeVideoProcess:
                 vid_output_file_path = os.path.join(output_dir, f"{counter}.mp4")
                 text_output_file_path = os.path.join(output_dir, f"{counter}.txt")
 
-                self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path)
+                self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path, counter)
 
                 start_time = end_time + 1
                 counter += 1
@@ -143,7 +168,7 @@ class RealTimeVideoProcess:
             vid_output_file_path = os.path.join(output_dir, f"{counter}.mp4")
             text_output_file_path = os.path.join(output_dir, f"{counter}.txt")
 
-            self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path)
+            self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path, counter)
 
             start_time = end_time + 1
             counter += 1
@@ -155,68 +180,6 @@ class RealTimeVideoProcess:
 # FLASK APP
 # ----------------------------------
 app = Flask(__name__)
-
-temp_objective_path = "objectives.txt"
-temp_warning_path = "warning.txt"
-
-WORKING_DIR = "video_qa"
-if os.path.exists(WORKING_DIR):
-    shutil.rmtree(WORKING_DIR)
-os.mkdir(WORKING_DIR)
-
-DB_DIR = os.path.join(WORKING_DIR, "DB")
-log_file_path = os.path.join(WORKING_DIR, "app.log")
-
-logging.basicConfig(
-    level=logging.INFO,  # or logging.INFO for less verbosity
-    format='%(asctime)s [%(levelname)s] %(name)s: %(message)s',
-    datefmt='%Y-%m-%d %H:%M:%S',
-    handlers=[logging.FileHandler(log_file_path)]
-)
-
-log = logging.getLogger(__name__)
-
-OBJECTIVE_FILE = temp_objective_path
-WARNINGS_FILE = temp_warning_path
-
-with open(OBJECTIVE_FILE, 'w') as f:
-    objectives = f.read()
-log.info("Objectives loaded")
-
-warnings = []
-with open(WARNINGS_FILE, "w") as f:
-    for line in f:
-        stripped_line = line.strip()
-        if stripped_line:
-            warnings.append(stripped_line)
-
-TIMESTAMP_EXTRACTOR = TimestampExtracter(DEFAULT_MM_PROMPT)
-log.info("Timestamp Extractor loaded")
-INFORMATION_PROCESSOR = Information_processor(warnings=warnings, objectives=objectives, working_dir=WORKING_DIR)
-log.info("Information Processor loaded")
-VIDEO_QUESTION_GENERATOR = VideoQuestionGenerator()
-log.info("Video Question Generator loaded")
-
-
-
-
-log.info("Warnings loaded")
-
-
-with open(os.path.join(WORKING_DIR, "objectives.txt"), "w") as f:
-    f.write(objectives)
-
-with open(os.path.join(WORKING_DIR, "warnings.txt"), "w") as f:
-    for line in warnings:
-        f.write(line)
-
-
-
-RTP = RealTimeVideoProcess(information_processor=INFORMATION_PROCESSOR, 
-                           timestamp_extractor=TIMESTAMP_EXTRACTOR, 
-                           video_question_generator=VIDEO_QUESTION_GENERATOR)
-
-log.info("RTP Loaded")
 
 ALLOWED_EXTENSIONS = {'mp4'}
 
@@ -233,10 +196,58 @@ def upload_video():
     Endpoint to receive a video file, store it locally,
     and start the background process for chunked QA + DB insertion.
     """
+    if os.path.exists(WORKING_DIR):
+        shutil.rmtree(WORKING_DIR)
+    os.mkdir(WORKING_DIR)
+
+
+
+    with open(OBJECTIVE_FILE, 'r') as f:
+        objectives = f.read()
+    log.info("Objectives loaded")
+
+    warnings = []
+    with open(WARNINGS_FILE, "r") as f:
+        for line in f:
+            stripped_line = line.strip()
+            if stripped_line:
+                warnings.append(stripped_line)
+
+    TIMESTAMP_EXTRACTOR = TimestampExtracter(DEFAULT_MM_PROMPT)
+    log.info("Timestamp Extractor loaded")
+    INFORMATION_PROCESSOR = Information_processor(warnings=warnings, objectives=objectives, working_dir=WORKING_DIR)
+    log.info("Information Processor loaded")
+    VIDEO_QUESTION_GENERATOR = VideoQuestionGenerator()
+    log.info("Video Question Generator loaded")
+
+
+
+
+    log.info("Warnings loaded")
+
+
+    with open(STORE_OBJECTIVE_FILE, "w") as f:
+        f.write(objectives)
+
+    with open(STORE_WARNINGS_FILE, "w") as f:
+        for line in warnings:
+            f.write(line)
+
+
+    RAG_SYSTEM = RAGSystem(db_dir=DB_DIR)
+    log.info("RAG Loaded")
+
+    RTP = RealTimeVideoProcess(rag_system=RAG_SYSTEM,
+                                information_processor=INFORMATION_PROCESSOR, 
+                            timestamp_extractor=TIMESTAMP_EXTRACTOR, 
+                            video_question_generator=VIDEO_QUESTION_GENERATOR, working_dir=WORKING_DIR)
+    log.info("RTP Loaded")
+
     if 'file' not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
 
     file = request.files['file']
+
     if file.filename == '':
         return jsonify({"error": "No selected file"}), 400
 
@@ -246,22 +257,22 @@ def upload_video():
         # Save file locally in 'uploads' folder (make sure folder exists)
         upload_folder = WORKING_DIR
         
-        video_path = os.path.join(upload_folder, "original_video", filename)
+        video_path = os.path.join(upload_folder, filename)
         file.save(video_path)
 
         # Create an output folder for chunked videos/text
         output_dir = os.path.join(upload_folder, "generated_video_content")
         os.makedirs(output_dir, exist_ok=True)
+        RTP.real_time_video_process(video_path, output_dir)
 
-        # Run the real_time_video_process in a new Thread
-        def background_task():
-            try:
-                RTP.real_time_video_process(video_path, output_dir)
-            except Exception as e:
-                print(f"Background task error: {e}")
+        # # Run the real_time_video_process in a new Thread
+        # def background_task():
+        #     try:
+        #     except Exception as e:
+        #         print(f"Background task error: {e}")
 
-        thread = threading.Thread(target=background_task, daemon=True)
-        thread.start()
+        # thread = threading.Thread(target=background_task, daemon=True)
+        # thread.start()
 
         return jsonify({"message": f"Video {filename} uploaded. Processing started in background."}), 200
     else:
@@ -280,20 +291,38 @@ def query_vector_db():
     question = data['question']
 
     # Get data from regular summarization RAG
+    relevant_documents = RAG_SYSTEM.query_vector_store(question)
+    if relevant_documents == "__NONE__":
+        return jsonify({"answer": "RAG not populated yet!"})
+    
+    # TODO: Get the specific video clips associated and the respective entropy frames (just the paths)
 
-    # Get the specific video clips associated and the respective entropy frames (just the paths)
+    # TODO: Get the KG Rag and the specific entity relationships (maybe have a UI for this)
 
-    # Get the KG Rag and the specific entity relationships (maybe have a UI for this)
+    # TODO: Use this to generate a comprehensive answer and return this to the user, along with the evidence.
 
-    # Use this to generate a comprehensive answer and return this to the user, along with the evidence.
-
-    # I need a simple UI on the other side of the process to be able to handle this.
+    # TODO: I need a simple UI on the other side of the process to be able to handle this.
 
     # Need to fix this 
     results = INFORMATION_PROCESSOR.query(question, top_k=1)
+
+
+    answer = "Your computed answer..."
+    video_path = "local/path/to/some_chunk.mp4"
     if results:
-        # Return the text from the best match
-        return jsonify({"answer": results[0]['text']})
+        image_paths = [
+            "local/path/to/img1.png",
+            "local/path/to/img2.png",
+            "local/path/to/img3.png",
+            "local/path/to/img4.png"
+        ]
+        return jsonify({
+            "answer": answer,
+            "video_path": video_path,
+            "image_paths": image_paths
+            })
+     
+
     else:
         return jsonify({"answer": "No data in vector DB yet."})
 

@@ -50,10 +50,17 @@ class Information_processor:
             with open(self.summary_file, "w") as f:
                 f.write(self.summary)
     
-    def _status_report(self, new_information, timestamp):
+    def _status_report(self, new_information, timestamp, objectives_updates, warnings_updates):
         prompt = f"You are tasked with a one sentence status report. The current status reports are: {str(self.status_report_messages)}.\
             The new information provided is: {new_information}. Given the objectives: {str(self.objectives)} and warnings: {str(self.warnings)}, Write a one sentence status report given the \
-                timestamp: {timestamp}, in the format [TIMESTAMP]: [STATUS REPORT]. only return the newest status report, ignore any old ones"
+                timestamp: {timestamp}, in the format [TIMESTAMP]: [STATUS REPORT]. only return the newest status report. Do not used the format OBJECTIVE RELATED: or WARNING RELATED: updates, those are manual updates from humans."
+        
+        if objectives_updates:
+            self.status_report_messages.append(f"OBJECTIVE RELATED: {objectives_updates}")
+        
+        if warnings_updates:
+            self.status_report_messages.append(f"WARNING RELATED: {warnings_updates}")
+        
         response = self.model.generate_content(prompt)
         self.status_report_messages.append(response.text)
         with open(self.status_report_file, "a") as f:
@@ -74,7 +81,7 @@ class Information_processor:
             f.write(self.long_term_memory)
 
     
-    def execute_parallel_updates(self, new_information, timestamp, new_object_information):
+    def execute_parallel_updates(self, new_information, timestamp, new_object_information, objectives_updates=None, warnings_updates=None):
         """
         Executes update_summary, status_report, and update_long_term_memory in parallel.
         
@@ -89,7 +96,7 @@ class Information_processor:
         with ThreadPoolExecutor() as executor:
             
             future_update_summary = executor.submit(self._update_summary, new_information)
-            future_status_report = executor.submit(self._status_report, new_information, timestamp)
+            future_status_report = executor.submit(self._status_report, new_information, timestamp, objectives_updates, warnings_updates)
             future_update_long_term_memory = executor.submit(self._update_long_term_memory, new_information, new_object_information)
             
             
@@ -206,18 +213,21 @@ class Information_processor:
         return parsed_data
      
 
-    def update_respective_informations(self, video_path, summary_of_clip):
+    def update_respective_information(self, video_path):
         
         text, frames = self.dense_caption(video_path)
-        text = TEST_DATA
+        # text = TEST_DATA
         text = self._extract_json_between_markers(text)
         json_data = json.loads(text)
         parsed_data = self.parse_video_data(json_data)
 
         key_frames = self.select_key_frames(parsed_data)
+        i = 0
         for frame_num in key_frames:
             frame = frames[frame_num]
-            self.draw_bounding_boxes(parsed_data["frames"][frame_num+1], frame, "")
+            output_name = f"{video_path[:-4]}_{i}.jpg"
+            self.draw_bounding_boxes(parsed_data["frames"][frame_num+1], frame, output_name)
+            i += 1
 
         return parsed_data
         
