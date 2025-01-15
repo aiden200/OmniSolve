@@ -136,7 +136,7 @@ class Information_processor:
 
         # Create a mapping of object names to their center points
         object_centers = {}
-        overlapping_names = {}
+
 
         for obj in frame_data["objects"]:
             bbox = obj["bbox"]
@@ -163,10 +163,6 @@ class Information_processor:
             center_x = (x1 + x2) // 2
             center_y = (y1 + y2) // 2
 
-            if name in object_centers:
-                count = overlapping_names.get(name, 0)
-                name = f"{name}_{count}"
-                overlapping_names[name] += 1
             object_centers[name] = (center_x, center_y)
             
             cv2.putText(image, name, (x1+2, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
@@ -201,23 +197,75 @@ class Information_processor:
         # input("Press Enter to continue...")
 
 
+    # def parse_video_data(self, video_data):
+    #     parsed_data = {
+    #         "frames": {},
+    #         "video_summary": video_data.get("video_summary", "")
+    #     }
+
+    #     for frame_key, frame_content in video_data.items():
+    #         if frame_key.startswith("frame_"):
+    #             frame_number = int(frame_key.split("_")[1])
+    #             parsed_data["frames"][frame_number] = {
+    #                 "objects": [
+    #                     {
+    #                         "name": obj["name"],
+    #                         "bbox": obj["bbox"]
+    #                     }
+    #                     for obj in frame_content.get("objects", [])
+    #                 ],
+    #                 "relationships": [
+    #                     {
+    #                         "object_1": rel["object_1"],
+    #                         "relationship": rel["relationship"],
+    #                         "object_2": rel["object_2"]
+    #                     }
+    #                     for rel in frame_content.get("relationships", [])
+    #                 ],
+    #                 "movements": frame_content.get("movements", []),
+    #                 "summary": frame_content.get("summary", "")
+    #             }
+
+    #     return parsed_data
+     
+
     def parse_video_data(self, video_data):
         parsed_data = {
             "frames": {},
             "video_summary": video_data.get("video_summary", "")
         }
 
+        objects = []
+
         for frame_key, frame_content in video_data.items():
             if frame_key.startswith("frame_"):
                 frame_number = int(frame_key.split("_")[1])
+
+                # Track how many times each name appears in this frame
+                name_count = {}
+
+                renamed_objects = []
+                for obj in frame_content.get("objects", []):
+                    original_name = obj["name"]
+                    bbox = obj["bbox"]
+                    
+                    count = name_count.get(original_name, 0)
+                    # If you want the first occurrence to remain as "human"
+                    # and subsequent ones to be "human_1", "human_2", etc.:
+                    if count == 0:
+                        new_name = original_name  # or f"{original_name}_0" if you prefer
+                    else:
+                        new_name = f"{original_name}_{count}"
+
+                    # Update the counter
+                    name_count[original_name] = count + 1
+
+                    renamed_objects.append({"name": new_name, "bbox": bbox})
+                    if new_name not in objects:
+                        objects.append(new_name)
+
                 parsed_data["frames"][frame_number] = {
-                    "objects": [
-                        {
-                            "name": obj["name"],
-                            "bbox": obj["bbox"]
-                        }
-                        for obj in frame_content.get("objects", [])
-                    ],
+                    "objects": renamed_objects,
                     "relationships": [
                         {
                             "object_1": rel["object_1"],
@@ -230,8 +278,8 @@ class Information_processor:
                     "summary": frame_content.get("summary", "")
                 }
 
-        return parsed_data
-     
+        return parsed_data, objects
+
 
     def update_respective_information(self, video_path):
         
@@ -239,7 +287,7 @@ class Information_processor:
         # text = TEST_DATA
         text = self._extract_json_between_markers(text)
         json_data = json.loads(text)
-        parsed_data = self.parse_video_data(json_data)
+        parsed_data, objects = self.parse_video_data(json_data)
 
         key_frames = self.select_key_frames(parsed_data)
         i = 0
@@ -249,7 +297,7 @@ class Information_processor:
             self.draw_bounding_boxes(parsed_data["frames"][frame_num], frame, output_name)
             i += 1
 
-        return parsed_data
+        return parsed_data, objects
         
         # pass
         # a warning should update the status report

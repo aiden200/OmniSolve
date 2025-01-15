@@ -79,8 +79,11 @@ class VectorPopulatorWorker:
                 self.prev_context.append(current_video_description) 
 
                 # Get objects from dense captioning & Extract Important clips TODO: Paralize 
-                new_object_information = self.information_processor.update_respective_information(vid_output_file_path)
-
+                new_object_information, new_objects = self.information_processor.update_respective_information(vid_output_file_path)
+                
+                # match any warning object alerts
+                warnings_messages = self.rag.detect_warnings(new_objects, 0.6)
+                
                 # Populate the regular vector DB & match any alerts from Objectives or warnings
                 self.rag.add_to_rag(current_video_description, vid_id)
                 
@@ -101,7 +104,7 @@ class VectorPopulatorWorker:
                     f'{start_time} - {end_time}', 
                     new_object_information,
                     objectives_updates,
-                    warnings_updates
+                    warnings_messages
                     )
 
 
@@ -109,6 +112,8 @@ class VectorPopulatorWorker:
             except Exception as e:
                 print(f"Vector population error: {e}")
                 log.info(f"ERROR: Vector population error for {self.task_num} with error: {e}")
+                self.task_num += 1
+                self.task_queue.task_done()
             finally:
                 log.info(f"Vector population for task {self.task_num} completed")
                 self.task_num += 1
@@ -181,6 +186,49 @@ class RealTimeVideoProcess:
         # cv2.destroyAllWindows()
 
 
+class SharedResources:
+    _instance = None
+
+    def __new__(cls):
+        if cls._instance is None:
+            cls._instance = super(SharedResources, cls).__new__(cls)
+            cls._instance.initialize_resources()
+        return cls._instance
+
+    def initialize_resources(self):
+        log.info("Initializing shared resources")
+        with open(OBJECTIVE_FILE, 'r') as f:
+            objectives = f.read()
+
+        warnings = []
+        with open(WARNINGS_FILE, "r") as f:
+            for line in f:
+                stripped_line = line.strip()
+                if stripped_line:
+                    warnings.append(stripped_line)
+
+        TIMESTAMP_EXTRACTOR = TimestampExtracter(DEFAULT_MM_PROMPT)
+        log.info("Timestamp Extractor loaded")
+        INFORMATION_PROCESSOR = Information_processor(warnings=warnings, objectives=objectives, working_dir=WORKING_DIR)
+        log.info("Information Processor loaded")
+        VIDEO_QUESTION_GENERATOR = VideoQuestionGenerator()
+        log.info("Video Question Generator loaded")
+        RAG_SYSTEM = RAGSystem(db_dir=DB_DIR, warnings=warnings)
+        log.info("RAG Loaded")
+        RTP = RealTimeVideoProcess(rag_system=RAG_SYSTEM,
+                                    information_processor=INFORMATION_PROCESSOR, 
+                                    timestamp_extractor=TIMESTAMP_EXTRACTOR, 
+                                    video_question_generator=VIDEO_QUESTION_GENERATOR, 
+                                    working_dir=WORKING_DIR)
+        log.info("RTP Loaded")
+
+        self.timestamp_extractor = TIMESTAMP_EXTRACTOR
+        self.information_processor = INFORMATION_PROCESSOR
+        self.video_question_generator = VIDEO_QUESTION_GENERATOR
+        self.rag_system = RAG_SYSTEM
+        self.rtp = RTP
+
+
 # ----------------------------------
 # FLASK APP
 # ----------------------------------
@@ -195,6 +243,8 @@ def allowed_file(filename):
 def home():
     return "Video QA Flask App is running!"
 
+
+
 @app.route('/upload', methods=['POST'])
 def upload_video():
     """
@@ -205,48 +255,11 @@ def upload_video():
         shutil.rmtree(WORKING_DIR)
     os.mkdir(WORKING_DIR)
 
+    resources = SharedResources()  # Get the shared resources
+
+    RTP = resources.rtp
 
 
-    with open(OBJECTIVE_FILE, 'r') as f:
-        objectives = f.read()
-    log.info("Objectives loaded")
-
-    warnings = []
-    with open(WARNINGS_FILE, "r") as f:
-        for line in f:
-            stripped_line = line.strip()
-            if stripped_line:
-                warnings.append(stripped_line)
-
-    TIMESTAMP_EXTRACTOR = TimestampExtracter(DEFAULT_MM_PROMPT)
-    log.info("Timestamp Extractor loaded")
-    INFORMATION_PROCESSOR = Information_processor(warnings=warnings, objectives=objectives, working_dir=WORKING_DIR)
-    log.info("Information Processor loaded")
-    VIDEO_QUESTION_GENERATOR = VideoQuestionGenerator()
-    log.info("Video Question Generator loaded")
-
-
-
-
-    log.info("Warnings loaded")
-
-
-    with open(STORE_OBJECTIVE_FILE, "w") as f:
-        f.write(objectives)
-
-    with open(STORE_WARNINGS_FILE, "w") as f:
-        for line in warnings:
-            f.write(line + "\n")
-
-
-    RAG_SYSTEM = RAGSystem(db_dir=DB_DIR)
-    log.info("RAG Loaded")
-
-    RTP = RealTimeVideoProcess(rag_system=RAG_SYSTEM,
-                                information_processor=INFORMATION_PROCESSOR, 
-                            timestamp_extractor=TIMESTAMP_EXTRACTOR, 
-                            video_question_generator=VIDEO_QUESTION_GENERATOR, working_dir=WORKING_DIR)
-    log.info("RTP Loaded")
 
     if 'file' not in request.files:
         return jsonify({"error": "No file part in the request"}), 400
@@ -295,8 +308,14 @@ def query_vector_db():
 
     question = data['question']
 
+    resources = SharedResources()  # Get the shared resources
+    RAG_SYSTEM = resources.rag_system
+    INFORMATION_PROCESSOR = resources.information_processor
+
     # Get data from regular summarization RAG
     relevant_documents = RAG_SYSTEM.query_vector_store(question)
+    relevant_kg_doucments = RAG_SYSTEM.query_kg(question)
+
     if relevant_documents == "__NONE__":
         return jsonify({"answer": "RAG not populated yet!"})
     
@@ -305,11 +324,10 @@ def query_vector_db():
     # TODO: Get the KG Rag and the specific entity relationships (maybe have a UI for this)
 
     # TODO: Use this to generate a comprehensive answer and return this to the user, along with the evidence.
-
+    results = ""
     # TODO: I need a simple UI on the other side of the process to be able to handle this.
 
-    # Need to fix this 
-    results = INFORMATION_PROCESSOR.query(question, top_k=1)
+    
 
 
     answer = "Your computed answer..."
