@@ -206,6 +206,15 @@ class SharedResources:
                 stripped_line = line.strip()
                 if stripped_line:
                     warnings.append(stripped_line)
+        
+
+        with open(STORE_OBJECTIVE_FILE, 'w') as f:
+            f.write(objectives)
+
+        
+        with open(STORE_WARNINGS_FILE, "w") as f:
+            for warn in warnings:
+                f.write(warn + "\n")
 
         TIMESTAMP_EXTRACTOR = TimestampExtracter(DEFAULT_MM_PROMPT)
         log.info("Timestamp Extractor loaded")
@@ -310,44 +319,46 @@ def query_vector_db():
 
     resources = SharedResources()  # Get the shared resources
     RAG_SYSTEM = resources.rag_system
-    INFORMATION_PROCESSOR = resources.information_processor
+    
 
     # Get data from regular summarization RAG
     relevant_documents = RAG_SYSTEM.query_vector_store(question)
-    relevant_kg_doucments = RAG_SYSTEM.query_kg(question)
+
+
+    image_paths = []
+    video_path = None
+    if relevant_documents == "__NONE__":
+        return jsonify({"answer": "No data in vector DB yet.", "video_path": video_path, "image_paths": image_paths})
+    
 
     if relevant_documents == "__NONE__":
         return jsonify({"answer": "RAG not populated yet!"})
     
-    # TODO: Get the specific video clips associated and the respective entropy frames (just the paths)
+    # Get the specific video clips associated and the respective entropy frames (just the paths)
+    most_relevant_vid_id = relevant_documents[0]['metadata']['full_video_id']
+    video_path = os.path.join(WORKING_DIR, "generated_video_content", f"{most_relevant_vid_id}.mp4")
+    for i in range(4):
+        name = os.path.join(WORKING_DIR, "generated_video_content", f"{most_relevant_vid_id}_{i}.mp4")
+        if os.path.exists(name):
+            image_paths.append(name)
+        else:
+            image_paths.append("")
 
     # TODO: Get the KG Rag and the specific entity relationships (maybe have a UI for this)
+    relevant_kg_doucments = RAG_SYSTEM.query_kg(question)
 
     # TODO: Use this to generate a comprehensive answer and return this to the user, along with the evidence.
-    results = ""
+    answer = ""
     # TODO: I need a simple UI on the other side of the process to be able to handle this.
 
-    
 
 
-    answer = "Your computed answer..."
-    video_path = "local/path/to/some_chunk.mp4"
-    if results:
-        image_paths = [
-            "local/path/to/img1.png",
-            "local/path/to/img2.png",
-            "local/path/to/img3.png",
-            "local/path/to/img4.png"
-        ]
-        return jsonify({
-            "answer": answer,
-            "video_path": video_path,
-            "image_paths": image_paths
-            })
-     
+    return jsonify({
+        "answer": answer,
+        "video_path": video_path,
+        "image_paths": image_paths
+        })
 
-    else:
-        return jsonify({"answer": "No data in vector DB yet."})
 
 # ----------------------------------
 # MAIN
