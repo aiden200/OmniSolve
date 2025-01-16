@@ -111,7 +111,7 @@ class VectorPopulatorWorker:
 
             except Exception as e:
                 print(f"Vector population error: {e}")
-                log.info(f"ERROR: Vector population error for {self.task_num} with error: {e}")
+                log.info(f"ERROR: Vector population error for task {self.task_num} with error: {e}")
                 self.task_num += 1
                 self.task_queue.task_done()
             finally:
@@ -245,6 +245,7 @@ app = Flask(__name__)
 
 ALLOWED_EXTENSIONS = {'mp4'}
 
+
 def allowed_file(filename):
     return '.' in filename and filename.rsplit('.', 1)[1].lower() in ALLOWED_EXTENSIONS
 
@@ -319,6 +320,7 @@ def query_vector_db():
 
     resources = SharedResources()  # Get the shared resources
     RAG_SYSTEM = resources.rag_system
+    INFORMATION_PROCESSOR = resources.information_processor
     
 
     # Get data from regular summarization RAG
@@ -327,18 +329,17 @@ def query_vector_db():
 
     image_paths = []
     video_path = None
-    if relevant_documents == "__NONE__":
+    if relevant_documents == "__NONE__" or not relevant_documents:
         return jsonify({"answer": "No data in vector DB yet.", "video_path": video_path, "image_paths": image_paths})
     
-
-    if relevant_documents == "__NONE__":
-        return jsonify({"answer": "RAG not populated yet!"})
+    context_text = "\n\n - -\n\n".join([doc.page_content for doc in relevant_documents])
+    
     
     # Get the specific video clips associated and the respective entropy frames (just the paths)
-    most_relevant_vid_id = relevant_documents[0]['metadata']['full_video_id']
+    most_relevant_vid_id = relevant_documents[0].metadata['full_video_id']
     video_path = os.path.join(WORKING_DIR, "generated_video_content", f"{most_relevant_vid_id}.mp4")
     for i in range(4):
-        name = os.path.join(WORKING_DIR, "generated_video_content", f"{most_relevant_vid_id}_{i}.mp4")
+        name = os.path.join(WORKING_DIR, "generated_video_content", f"{most_relevant_vid_id}_{i}.jpg")
         if os.path.exists(name):
             image_paths.append(name)
         else:
@@ -347,17 +348,20 @@ def query_vector_db():
     # TODO: Get the KG Rag and the specific entity relationships (maybe have a UI for this)
     relevant_kg_doucments = RAG_SYSTEM.query_kg(question)
 
-    # TODO: Use this to generate a comprehensive answer and return this to the user, along with the evidence.
-    answer = ""
+    # Use this to generate a comprehensive answer and return this to the user, along with the evidence.
+    # TODO: Object context not implemented
+    answer = INFORMATION_PROCESSOR.process_q_and_a(question, context_text, relevant_kg_doucments)
     # TODO: I need a simple UI on the other side of the process to be able to handle this.
 
-
-
-    return jsonify({
+    payload = {
         "answer": answer,
         "video_path": video_path,
         "image_paths": image_paths
-        })
+        }
+
+    # print(payload)
+
+    return jsonify(payload)
 
 
 # ----------------------------------

@@ -103,6 +103,20 @@ class Information_processor:
             for future in [future_update_summary, future_status_report, future_update_long_term_memory]:
                 future.result() 
 
+
+    def process_q_and_a(self, question, text_context, object_context):
+        PROMPT_TEMPLATE = f"""
+Answer the question based only on the following context:
+{text_context}
+
+
+ - -
+If you cannot answer the question based on the context, reply 'I don't know'.
+Answer the question based on the above context: {question}
+"""
+        answer = self.model.generate_content(PROMPT_TEMPLATE)
+
+        return answer.text
     
 
     def calculate_entropy(self, frame):
