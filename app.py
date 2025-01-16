@@ -84,6 +84,7 @@ class VectorPopulatorWorker:
                 # match any warning object alerts
                 warnings_messages = self.rag.detect_warnings(new_objects, 0.6)
                 
+                
                 # Populate the regular vector DB & match any alerts from Objectives or warnings
                 self.rag.add_to_rag(current_video_description, vid_id)
                 

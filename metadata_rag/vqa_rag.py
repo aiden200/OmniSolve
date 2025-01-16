@@ -44,7 +44,7 @@ class RAGSystem:
                 similarity = cosine_similarity(
                     [new_object_embedding], [embedding]
                 )[0][0]
-                # print(f"object {warning} matched object {object} with similarity of: {similarity}")
+                print(f"object {warning} matched object {object} with similarity of: {similarity}")
                 if similarity > threshold:
                     warning_messages.append(f"WARNING: object {warning} matched object {object} with similarity of: {similarity}")
         

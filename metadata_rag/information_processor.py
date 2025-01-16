@@ -55,15 +55,19 @@ class Information_processor:
             The new information provided is: {new_information}. Given the objectives: {str(self.objectives)} and warnings: {str(self.warnings)}, Write a one sentence status report given the \
                 timestamp: {timestamp}, in the format [TIMESTAMP]: [STATUS REPORT]. only return the newest status report. Do not used the format OBJECTIVE RELATED: or WARNING RELATED: updates, those are manual updates from humans."
         
-        if objectives_updates:
-            self.status_report_messages.append(f"OBJECTIVE RELATED: {objectives_updates}")
-        
-        if warnings_updates:
-            self.status_report_messages.append(f"WARNING RELATED: {warnings_updates}")
-        
-        response = self.model.generate_content(prompt)
-        self.status_report_messages.append(response.text)
+
         with open(self.status_report_file, "a") as f:
+            if objectives_updates:
+                self.status_report_messages.append(f"OBJECTIVE RELATED: {objectives_updates}")
+                f.write(f"OBJECTIVE RELATED: {objectives_updates}" + "\n")
+            
+            if warnings_updates:
+                for warnings in warnings_updates:
+                    self.status_report_messages.append(f"WARNING RELATED: {warnings}")
+                    f.write(f"WARNING RELATED: {warnings}" + "\n")
+            
+            response = self.model.generate_content(prompt)
+            self.status_report_messages.append(response.text)
             f.write(response.text + "\n")
 
     
@@ -306,7 +310,7 @@ Answer the question based on the above context: {question}
         key_frames = self.select_key_frames(parsed_data)
         i = 0
         for frame_num in key_frames:
-            frame = frames[frame_num]
+            frame = frames[frame_num] # this line is wrong
             output_name = f"{video_path[:-4]}_{i}.jpg"
             self.draw_bounding_boxes(parsed_data["frames"][frame_num], frame, output_name)
             i += 1
@@ -329,7 +333,7 @@ For each frame, perform the following:
 After processing all frames:
 5. Summarize the overall dynamics of the video, including the key objects, their interactions, and movement patterns.
 
-Format the output in JSON as follows:
+Format the output in JSON as follows, where "frame_n" starts with "frame_0":
 {
     "frame_n": {
         "objects": [{"name": "object_name", "bbox": [ymin, xmin, ymax, xmax]}],
