@@ -1,11 +1,10 @@
 import os
 
-WORKING_DIR = "working_dir"
 
 temp_objective_path = "objectives.txt"
 temp_warning_path = "warning.txt"
 
-WORKING_DIR = "video_qa"
+WORKING_DIR = "3d_rec_drone"
 OBJECTIVE_FILE = temp_objective_path
 WARNINGS_FILE = temp_warning_path
 DB_DIR = os.path.join(WORKING_DIR, "DB")

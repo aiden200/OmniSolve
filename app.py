@@ -113,11 +113,14 @@ class VectorPopulatorWorker:
                 print(f"Vector population error: {e}")
                 log.info(f"ERROR: Vector population error for task {self.task_num} with error: {e}")
                 self.task_num += 1
-                self.task_queue.task_done()
+                if self.task_queue.not_empty:
+                    self.task_queue.task_done()
             finally:
                 log.info(f"Vector population for task {self.task_num} completed")
                 self.task_num += 1
-                self.task_queue.task_done()
+                if self.task_queue.not_empty:
+                    self.task_queue.task_done()
+                # self.task_queue.task_done()
 
     def stop(self):
         """Signal the worker to stop, then wait for thread to finish."""
