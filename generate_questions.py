@@ -124,7 +124,7 @@ class VideoParser:
     
 
     def dense_caption_videos(self, video_path):
-        dense_captions = self.information_processor.update_respective_informations(video_path, "")
+        dense_captions = self.information_processor.update_respective_information(video_path)
         print(dense_captions)
 
     def generate_over_entire_video(self, video_url):

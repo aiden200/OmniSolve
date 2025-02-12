@@ -59,12 +59,12 @@ class Information_processor:
         with open(self.status_report_file, "a") as f:
             if objectives_updates:
                 self.status_report_messages.append(f"OBJECTIVE RELATED: {objectives_updates}")
-                f.write(f"OBJECTIVE RELATED: {objectives_updates}" + "\n")
+                f.write(f"OBJECTIVE RELATED: {objectives_updates}" + "\n\n")
             
             if warnings_updates:
                 for warnings in warnings_updates:
                     self.status_report_messages.append(f"WARNING RELATED: {warnings}")
-                    f.write(f"WARNING RELATED: {warnings}" + "\n")
+                    f.write(f"WARNING RELATED: {warnings}" + "\n\n")
             
             response = self.model.generate_content(prompt)
             self.status_report_messages.append(response.text)

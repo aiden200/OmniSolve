@@ -125,6 +125,7 @@ def write_rest_of_categories(multivent_video_path, new_video_path):
 
 
 def generate_captions_msr_vtt(msr_vtt, new_video_path):
+    exit(0)
     split_video_path = os.path.join(new_video_path, "split_videos")
     temporary_dir = os.path.join(msr_vtt, "temp")
     failed_video_path = os.path.join(new_video_path, "failed.csv")
