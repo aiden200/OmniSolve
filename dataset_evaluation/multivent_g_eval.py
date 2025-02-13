@@ -1,17 +1,11 @@
 import json, os
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from sklearn.metrics.pairwise import cosine_similarity
-
-
-def evaluate_gemini(results_dir):
-    pass
-
-def evaluate_gpt4(results_dir):
-    pass
-
-def extract_result_files(result_directory):
-    pass
-
+from depth_extraction.extract_depth import DepthCalculator
+from collections import defaultdict
+import matplotlib.pyplot as plt
+import numpy as np
+import cv2
 
 import math
 from collections import defaultdict
@@ -38,6 +32,39 @@ def compute_iou(bbox1, bbox2):
         return 0
     return inter_area / union_area
 
+
+def load_frame(video_path, frame_number):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Could not open video {video_path}")
+        return None
+
+    # Set the video position to the desired frame number
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+
+    
+    ret, frame = cap.read()
+    if not ret:
+        print(f"Error: Could not read frame {frame_number} from {video_path}")
+        cap.release()
+        return None
+    
+    cap.release()
+    return frame
+
+
+def get_total_frames(video_path):
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        print(f"Error: Could not open video {video_path}")
+        return 0  # or you can return None
+    total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT))
+    cap.release()
+    return total_frames
+
+
+
 def semantic_similarity(entity1: str, entity2: str, embedding_model: SentenceTransformerEmbeddings) -> float:
 
     em_1 = embedding_model.embed_query(entity1)
@@ -46,88 +73,326 @@ def semantic_similarity(entity1: str, entity2: str, embedding_model: SentenceTra
     
     return similarity
 
-def compute_statistics(ground_truths, predictions, iou_threshold=0.5):
-    """
-    For each detection in the ground_truths list, finds matching predictions on the same frame,
-    computes IoU between bounding boxes, and if IoU >= threshold, computes semantic similarity.
+
+def frame_depth_level(frame, depth_extractor: DepthCalculator):
+    depth = depth_extractor.extract_image_depth(frame)
+    return depth
+
+
+
+def visualize_metrics(evaluation_metrics):
+    overall_metrics = evaluation_metrics["overall_metrics"]
+    video_metrics = evaluation_metrics["video_metrics"]
     
-    Both ground_truths and predictions are lists of dictionaries with keys:
-      - role (e.g., "what")
-      - entity (a string)
-      - frame (an integer)
-      - bbox (list of four numbers [x1, y1, x2, y2])
-      - certainty (a numeric value)
-      - ocr_flag (boolean)
-      
+    # Plot overall metrics.
+    labels = ["Recall", "Precision", "Avg Semantic Similarity"]
+    values = [
+        overall_metrics["overall_recall"],
+        overall_metrics["overall_precision"],
+        overall_metrics["overall_avg_sem_sim"]
+    ]
+    plt.figure(figsize=(8, 6))
+    plt.bar(labels, values, color=["blue", "green", "orange"])
+    plt.ylim(0, 1)
+    plt.title("Overall Metrics")
+    plt.show()
+    
+    # Plot per-video metrics.
+    videos = list(video_metrics.keys())
+    recalls = [video_metrics[v]["recall"] for v in videos]
+    precisions = [video_metrics[v]["precision"] for v in videos]
+    avg_sem_sims = [video_metrics[v]["avg_sem_sim"] for v in videos]
+    
+    plt.figure(figsize=(10, 8))
+    
+    plt.subplot(3, 1, 1)
+    plt.bar(videos, recalls, color="blue")
+    plt.ylabel("Recall")
+    plt.title("Per-Video Metrics")
+    
+    plt.subplot(3, 1, 2)
+    plt.bar(videos, precisions, color="green")
+    plt.ylabel("Precision")
+    
+    plt.subplot(3, 1, 3)
+    plt.bar(videos, avg_sem_sims, color="orange")
+    plt.ylabel("Avg Semantic Similarity")
+    plt.xticks(rotation=45)
+    
+    plt.tight_layout()
+    plt.show()
+
+
+
+def aggregate_per_category(overall_stats):
+    """
+    For each category (e.g., "confidence", "depth", etc.), this function
+    aggregates performance metrics by grouping all items with the same
+    category value and computing the average precision, recall, and semantic similarity.
+    
+    overall_stats: dict
+      Keys are category names and values are lists of tuples:
+         (category_value, (precision, recall, avg_sem_sim))
+    
     Returns:
-      A dictionary mapping (role, certainty) to a list of tuples (iou, similarity).
+      aggregated: dict
+         Structure:
+         {
+           "confidence": {
+               value1: {"avg_precision": ..., "avg_recall": ..., "avg_sem_sim": ..., "count": n},
+               value2: { ... },
+               ...
+           },
+           "depth": { ... },
+           ...
+         }
     """
-    # Sort the lists by frame for clarity (if not already sorted)
-    ground_truths = sorted(ground_truths, key=lambda d: d["frame"])
-    predictions = sorted(predictions, key=lambda d: d["frame"])
-
-    # Dictionary to store results keyed by (role, certainty)
-    results = defaultdict(list)
-    
-    # For each ground truth detection, find predictions on the same frame
-    for gt in ground_truths:
-        gt_frame = gt["frame"]
-        # Filter predictions that occur on the same frame.
-        frame_preds = [pred for pred in predictions if pred["frame"] == gt_frame]
-        for pred in frame_preds:
-            iou = compute_iou(gt["bbox"], pred["bbox"])
-            if iou >= iou_threshold:
-                sim = semantic_similarity(gt["entity"], pred["entity"])
-                key = (gt["role"], gt["certainty"])
-                results[key].append((iou, sim))
-    
-    return results
-
-def aggregate_stats(results):
-    """
-    Given a dictionary where keys are (role, certainty) and values are lists of (iou, similarity)
-    tuples, compute summary statistics for each key.
-    
-    Returns a dictionary mapping (role, certainty) to aggregated stats.
-    """
+    from collections import defaultdict
     aggregated = {}
-    for key, values in results.items():
-        if values:
-            iou_vals, sim_vals = zip(*values)
-            aggregated[key] = {
-                "count": len(values),
-                "avg_iou": sum(iou_vals) / len(iou_vals),
-                "avg_similarity": sum(sim_vals) / len(sim_vals)
+    for category, entries in overall_stats.items():
+        groups = defaultdict(list)
+        # Group all entries by the category value.
+        for cat_value, performance in entries:
+            cat_value = round(float(cat_value), 3) if isinstance(cat_value, np.floating) else cat_value
+            groups[cat_value].append(performance)
+        aggregated[category] = {}
+        for cat_value, performances in groups.items():
+            cat_value = round(float(cat_value), 3) if isinstance(cat_value, np.floating) else cat_value
+            # Separate out each performance component. We ignore None values.
+            precisions = [p for (p, r, s) in performances if p is not None]
+            recalls    = [r for (p, r, s) in performances if r is not None]
+            sem_sims   = [s for (p, r, s) in performances if s is not None]
+            
+            avg_precision = round(float(np.mean(precisions)), 3) if precisions else None
+            avg_recall    = round(float(np.mean(recalls)), 3) if recalls else None
+            avg_sem_sim   = round(float(np.mean(sem_sims)), 3) if sem_sims else None
+
+            
+            aggregated[category][cat_value] = {
+                "avg_precision": avg_precision,
+                "avg_recall": avg_recall,
+                "avg_sem_sim": avg_sem_sim,
+                "count": len(performances)
             }
-        else:
-            aggregated[key] = {
-                "count": 0,
-                "avg_iou": None,
-                "avg_similarity": None
-            }
+    
+    # print(aggregated)
+
     return aggregated
 
 
-def evaluate_multivent_g(result_dir, multivent_g_json_file, threshold, model_name = "sentence-transformers/all-MiniLM-L12-v1"):
-    
-    embedding_model = SentenceTransformerEmbeddings(model_name=model_name, model_kwargs={"trust_remote_code" : True})
 
+
+def evaluate_multivent_g(result_dir, 
+                         multivent_g_json_file, 
+                         multivent_yt_path,
+                         threshold,
+                         model_name="sentence-transformers/all-MiniLM-L12-v1",
+                         visualize=False):
+    # Initialize models.
+    embedding_model = SentenceTransformerEmbeddings(model_name=model_name, model_kwargs={"trust_remote_code": True})
+    depth_extractor = DepthCalculator()
     
+    # Load ground truth.
     with open(multivent_g_json_file, "r") as f:
         multivent_g_ground_truth = json.load(f)
-        
+    
+    # Each video is a sub-directory in result_dir.
     videos = [name for name in os.listdir(result_dir) if os.path.isdir(os.path.join(result_dir, name))]
     
-    for video in videos:
-        video_ground_truth = multivent_g_ground_truth[video]
-        with open(os.path.join(result_dir, video, "results.json")) as f:
-            results = json.load(f)
-        
-        
+    overall_stats = defaultdict(list)
     
-        # Hallucinations
+    # Global counters for overall metrics.
+    total_gt_objects_global = 0
+    total_pred_objects_global = 0
+    detected_gt_global = 0   # Number of GT objects matched.
+    detected_pred_global = 0 # Number of predictions matched.
+    all_sem_sims = []        # All semantic similarity scores across matches.
+    
+    # Store per-video metrics.
+    video_metrics = {}
+    
+    print(videos[0])
+    videos = [videos[0]]
+
+    for video in videos:
+        video_load_path = os.path.join(multivent_yt_path, f"{video}.mp4")
+        video_path = os.path.join(result_dir, video)
+        video_ground_truth = multivent_g_ground_truth.get(video, {})
+        gt_objects = video_ground_truth.get("spatial", [])
         
-        # Retrieval of objects
+        # Organize GT by frame.
+        gt_frames = defaultdict(list)
+        for obj in gt_objects:
+            frame_number = obj["frame"]
+            gt_frames[frame_number].append(obj)
         
-        # Labeling of objects
+        #TODO: Correct this format
+        # Load predictions.
+        with open(os.path.join(video_path, "results.json")) as f:
+            predictions = json.load(f)
         
+
+        predictions = predictions["spatial"]
+        # Organize predictions by frame.
+        pred_frames = defaultdict(list)
+        for pred in predictions:
+            pred_frames[pred["frame"]].append(pred)
+        
+        
+        # All frames present in GT or predictions.
+        all_frames = set(gt_frames.keys()).union(pred_frames.keys())
+        
+        # Per-video counters.
+        video_total_gt = 0
+        video_total_pred = 0
+        video_detected_gt = 0
+        video_detected_pred = 0
+        video_sem_sims = []  # Semantic similarities for this video.
+
+        video_total_frames = get_total_frames(video_load_path)
+        
+        for frame_number in sorted(all_frames):
+            frame = load_frame(video_load_path, frame_number)
+            if frame is None:
+                print(f"Error: Missing frame {frame_number} in video {video}")
+                continue
+            
+            avg_depth = frame_depth_level(frame, depth_extractor)
+            
+            frame_gt_objects = gt_frames.get(frame_number, [])
+            frame_pred_objects = pred_frames.get(frame_number, [])
+            
+            video_total_gt += len(frame_gt_objects)
+            video_total_pred += len(frame_pred_objects)
+            
+            # For matching in the current frame.
+            gt_matches = [False] * len(frame_gt_objects)
+            pred_matches = [False] * len(frame_pred_objects)
+            semantic_similarities = []
+            
+            # Loop over all GT and predictions.
+            for i, gt_obj in enumerate(frame_gt_objects):
+                for j, pred_obj in enumerate(frame_pred_objects):
+                    iou = compute_iou(gt_obj["bbox"], pred_obj["bbox"])
+                    if iou >= threshold:
+                        gt_matches[i] = True
+                        pred_matches[j] = True
+                        sim = semantic_similarity(gt_obj["entity"], pred_obj["entity"], embedding_model)
+                        semantic_similarities.append(sim)
+                        all_sem_sims.append(sim)
+                        video_sem_sims.append(sim)
+            
+            frame_detected_gt = sum(gt_matches)
+            frame_detected_pred = sum(pred_matches)
+            
+            # Frame-level recall and precision.
+            frame_recall = frame_detected_gt / len(frame_gt_objects) if frame_gt_objects else None
+            frame_precision = frame_detected_pred / len(frame_pred_objects) if frame_pred_objects else None
+            avg_sem_sim = np.mean(semantic_similarities) if semantic_similarities else None
+            
+            # Performance tuple for this frame.
+            performance_tuple = (frame_precision, frame_recall, avg_sem_sim)
+            
+            # Record per-object (ground truth) stats with performance tuple.
+            object_count = len(frame_gt_objects)
+            for obj in frame_gt_objects:
+                certainty = obj["certainty"]
+                role = obj["role"]
+                entity = obj["entity"]
+                bbox = obj["bbox"]
+                x1, y1, x2, y2 = bbox
+                object_size = abs(x2 - x1) * abs(y2 - y1)
+
+                current_frame_percentage = round(frame_number/video_total_frames, 3)
+                
+                overall_stats["confidence"].append((certainty, performance_tuple))
+                overall_stats["depth"].append((avg_depth, performance_tuple))
+                overall_stats["role"].append((role, performance_tuple))
+                overall_stats["object_size"].append((object_size, performance_tuple))
+                overall_stats["object_cluster"].append((object_count, performance_tuple))
+                overall_stats["frame_number"].append((current_frame_percentage, performance_tuple))
+            
+            video_detected_gt += frame_detected_gt
+            video_detected_pred += frame_detected_pred
+        
+        # Video-level recall and precision.
+        video_recall = video_detected_gt / video_total_gt if video_total_gt > 0 else None
+        video_precision = video_detected_pred / video_total_pred if video_total_pred > 0 else None
+        video_avg_sem_sim = np.mean(video_sem_sims) if video_sem_sims else None
+        
+        print(f"Video: {video}")
+        print(f"  Retrieval Recall: {video_recall:.2f} (matched {video_detected_gt}/{video_total_gt})")
+        print(f"  Hallucination Precision: {video_precision:.2f} (matched {video_detected_pred}/{video_total_pred})")
+        
+        video_metrics[video] = {
+            "recall": video_recall,
+            "precision": video_precision,
+            "avg_sem_sim": video_avg_sem_sim,
+            "total_gt": video_total_gt,
+            "total_pred": video_total_pred,
+            "detected_gt": video_detected_gt,
+            "detected_pred": video_detected_pred
+        }
+        
+        total_gt_objects_global += video_total_gt
+        total_pred_objects_global += video_total_pred
+        detected_gt_global += video_detected_gt
+        detected_pred_global += video_detected_pred
+    
+    overall_recall = detected_gt_global / total_gt_objects_global if total_gt_objects_global > 0 else None
+    overall_precision = detected_pred_global / total_pred_objects_global if total_pred_objects_global > 0 else None
+    overall_avg_sem_sim = np.mean(all_sem_sims) if all_sem_sims else None
+    
+    print("Overall Metrics:")
+    print(f"  Overall Retrieval Recall: {overall_recall:.2f} ({detected_gt_global}/{total_gt_objects_global})")
+    print(f"  Overall Hallucination Precision: {overall_precision:.2f} ({detected_pred_global}/{total_pred_objects_global})")
+    
+    # Aggregate the per-object stats.
+    aggregated_results = {}
+    for category, data in overall_stats.items():
+        data_sorted = sorted(data, key=lambda x: x[0])
+        aggregated_results[category] = data_sorted
+
+    # Prepare an evaluation metrics dictionary.
+    evaluation_metrics = {
+        "overall_metrics": {
+            "overall_recall": overall_recall,
+            "overall_precision": overall_precision,
+            "overall_avg_sem_sim": overall_avg_sem_sim,
+            "total_gt_objects": total_gt_objects_global,
+            "total_pred_objects": total_pred_objects_global,
+            "detected_gt": detected_gt_global,
+            "detected_pred": detected_pred_global
+        },
+        "video_metrics": video_metrics,
+        "aggregated_stats": aggregated_results
+    }
+    
+    # Save the evaluation metrics to a JSON file.
+    with open("evaluation_metrics.json", "w") as f:
+        json.dump(evaluation_metrics, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
+    
+
+    aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
+    with open("category_evaluation.json", "w") as f:
+        json.dump(aggregated_by_category, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
+
+
+    # Optionally visualize the metrics.
+    if visualize:
+        visualize_metrics(evaluation_metrics)
+    
+    return evaluation_metrics
+
+
+
+
+result_dir = "/data/multivent_processed/"
+multivent_g_json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
+multivent_yt_path = "/data/multivent_yt_videos/"
+threshold = .5
+
+
+evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, visualize=True)
+# aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
+# print(json.dumps(aggregated_by_category, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o))

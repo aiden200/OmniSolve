@@ -35,6 +35,14 @@ class DepthCalculator:
         self.model = DepthAnythingV2(**model_configs[encoder])
         self.model.load_state_dict(torch.load(f'depth_extraction/checkpoints/depth_anything_v2_{encoder}.pth', map_location='cpu', weights_only=True))
         self.model = self.model.to(DEVICE).eval()
+    
+
+    def extract_image_depth(self, frame):
+        depth = self.model.infer_image(frame, 518)
+        avg_depth = np.mean(depth)
+
+        return avg_depth
+
 
     def extract_video_depth(self, video_path, output_path):
         """
