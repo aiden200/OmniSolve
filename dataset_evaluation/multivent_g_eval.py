@@ -163,9 +163,9 @@ def aggregate_per_category(overall_stats):
             recalls    = [r for (p, r, s) in performances if r is not None]
             sem_sims   = [s for (p, r, s) in performances if s is not None]
             
-            avg_precision = round(float(np.mean(precisions)), 3) if precisions else None
-            avg_recall    = round(float(np.mean(recalls)), 3) if recalls else None
-            avg_sem_sim   = round(float(np.mean(sem_sims)), 3) if sem_sims else None
+            avg_precision = round(float(np.mean(precisions)), 3) if precisions else 0
+            avg_recall    = round(float(np.mean(recalls)), 3) if recalls else 0
+            avg_sem_sim   = round(float(np.mean(sem_sims)), 3) if sem_sims else 0
 
             
             aggregated[category][cat_value] = {
@@ -186,6 +186,8 @@ def evaluate_multivent_g(result_dir,
                          multivent_g_json_file, 
                          multivent_yt_path,
                          threshold,
+                         evaluation="gemini",
+                         evaluation_file="gemini_results.json",
                          model_name="sentence-transformers/all-MiniLM-L12-v1",
                          visualize=False):
     # Initialize models.
@@ -211,31 +213,33 @@ def evaluate_multivent_g(result_dir,
     # Store per-video metrics.
     video_metrics = {}
     
-    print(videos[0])
-    videos = [videos[0]]
+    #TODO: Get rid of this
+    videos = ["EDLy6c3jH8U"]
 
+    # Load evaluation results 
+    if evaluation == "gemini":
+        with open(evaluation_file, "r") as f:
+            predictions = json.load(f)
+        
+    
     for video in videos:
         video_load_path = os.path.join(multivent_yt_path, f"{video}.mp4")
         video_path = os.path.join(result_dir, video)
         video_ground_truth = multivent_g_ground_truth.get(video, {})
         gt_objects = video_ground_truth.get("spatial", [])
         
+            
         # Organize GT by frame.
         gt_frames = defaultdict(list)
         for obj in gt_objects:
             frame_number = obj["frame"]
             gt_frames[frame_number].append(obj)
         
-        #TODO: Correct this format
-        # Load predictions.
-        with open(os.path.join(video_path, "results.json")) as f:
-            predictions = json.load(f)
-        
 
-        predictions = predictions["spatial"]
         # Organize predictions by frame.
+        video_predictions = predictions[video]
         pred_frames = defaultdict(list)
-        for pred in predictions:
+        for pred in video_predictions:
             pred_frames[pred["frame"]].append(pred)
         
         
@@ -274,6 +278,7 @@ def evaluate_multivent_g(result_dir,
             for i, gt_obj in enumerate(frame_gt_objects):
                 for j, pred_obj in enumerate(frame_pred_objects):
                     iou = compute_iou(gt_obj["bbox"], pred_obj["bbox"])
+                    print(iou)
                     if iou >= threshold:
                         gt_matches[i] = True
                         pred_matches[j] = True
@@ -286,9 +291,9 @@ def evaluate_multivent_g(result_dir,
             frame_detected_pred = sum(pred_matches)
             
             # Frame-level recall and precision.
-            frame_recall = frame_detected_gt / len(frame_gt_objects) if frame_gt_objects else None
-            frame_precision = frame_detected_pred / len(frame_pred_objects) if frame_pred_objects else None
-            avg_sem_sim = np.mean(semantic_similarities) if semantic_similarities else None
+            frame_recall = frame_detected_gt / len(frame_gt_objects) if frame_gt_objects else 0
+            frame_precision = frame_detected_pred / len(frame_pred_objects) if frame_pred_objects else 0
+            avg_sem_sim = np.mean(semantic_similarities) if semantic_similarities else 0
             
             # Performance tuple for this frame.
             performance_tuple = (frame_precision, frame_recall, avg_sem_sim)
@@ -316,9 +321,9 @@ def evaluate_multivent_g(result_dir,
             video_detected_pred += frame_detected_pred
         
         # Video-level recall and precision.
-        video_recall = video_detected_gt / video_total_gt if video_total_gt > 0 else None
-        video_precision = video_detected_pred / video_total_pred if video_total_pred > 0 else None
-        video_avg_sem_sim = np.mean(video_sem_sims) if video_sem_sims else None
+        video_recall = video_detected_gt / video_total_gt if video_total_gt > 0 else 0
+        video_precision = video_detected_pred / video_total_pred if video_total_pred > 0 else 0
+        video_avg_sem_sim = np.mean(video_sem_sims) if video_sem_sims else 0
         
         print(f"Video: {video}")
         print(f"  Retrieval Recall: {video_recall:.2f} (matched {video_detected_gt}/{video_total_gt})")
@@ -339,9 +344,9 @@ def evaluate_multivent_g(result_dir,
         detected_gt_global += video_detected_gt
         detected_pred_global += video_detected_pred
     
-    overall_recall = detected_gt_global / total_gt_objects_global if total_gt_objects_global > 0 else None
-    overall_precision = detected_pred_global / total_pred_objects_global if total_pred_objects_global > 0 else None
-    overall_avg_sem_sim = np.mean(all_sem_sims) if all_sem_sims else None
+    overall_recall = detected_gt_global / total_gt_objects_global if total_gt_objects_global > 0 else 0
+    overall_precision = detected_pred_global / total_pred_objects_global if total_pred_objects_global > 0 else 0
+    overall_avg_sem_sim = np.mean(all_sem_sims) if all_sem_sims else 0
     
     print("Overall Metrics:")
     print(f"  Overall Retrieval Recall: {overall_recall:.2f} ({detected_gt_global}/{total_gt_objects_global})")
@@ -369,12 +374,12 @@ def evaluate_multivent_g(result_dir,
     }
     
     # Save the evaluation metrics to a JSON file.
-    with open("evaluation_metrics.json", "w") as f:
+    with open("benchmark_results/evaluation_metrics.json", "w") as f:
         json.dump(evaluation_metrics, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
     
 
     aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
-    with open("category_evaluation.json", "w") as f:
+    with open("benchmark_results/category_evaluation.json", "w") as f:
         json.dump(aggregated_by_category, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
 
 
@@ -390,9 +395,11 @@ def evaluate_multivent_g(result_dir,
 result_dir = "/data/multivent_processed/"
 multivent_g_json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
 multivent_yt_path = "/data/multivent_yt_videos/"
-threshold = .5
+evaluation = "gemini"
+evaluation_file = "benchmark_results/gemini_results.json"
+threshold = .1
 
 
-evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, visualize=True)
+evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
 # aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
 # print(json.dumps(aggregated_by_category, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o))
