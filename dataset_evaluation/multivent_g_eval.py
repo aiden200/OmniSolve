@@ -1,4 +1,7 @@
 import json, os
+from langchain_community.embeddings import SentenceTransformerEmbeddings
+from sklearn.metrics.pairwise import cosine_similarity
+
 
 def evaluate_gemini(results_dir):
     pass
@@ -35,18 +38,13 @@ def compute_iou(bbox1, bbox2):
         return 0
     return inter_area / union_area
 
-def semantic_similarity(entity1, entity2):
-    """
-    Stub for semantic similarity calculation.
-    Replace this with your actual semantic similarity function.
-    For demonstration, we'll use a simple metric: 
-    the normalized Levenshtein distance (1 - normalized distance)
-    or any other similarity measure.
-    """
-    # For the purpose of this example, we'll return 1.0 if the strings are equal,
-    # or 0.0 otherwise.
+def semantic_similarity(entity1: str, entity2: str, embedding_model: SentenceTransformerEmbeddings) -> float:
+
+    em_1 = embedding_model.embed_query(entity1)
+    em_2 = embedding_model.embed_query(entity2)
+    similarity = cosine_similarity([em_1], [em_2])[0][0]
     
-    return 1.0 if entity1.strip().lower() == entity2.strip().lower() else 0.0
+    return similarity
 
 def compute_statistics(ground_truths, predictions, iou_threshold=0.5):
     """
@@ -110,7 +108,10 @@ def aggregate_stats(results):
     return aggregated
 
 
-def evaluate_multivent_g(result_dir, multivent_g_json_file, threshold, rating):
+def evaluate_multivent_g(result_dir, multivent_g_json_file, threshold, model_name = "sentence-transformers/all-MiniLM-L12-v1"):
+    
+    embedding_model = SentenceTransformerEmbeddings(model_name=model_name, model_kwargs={"trust_remote_code" : True})
+
     
     with open(multivent_g_json_file, "r") as f:
         multivent_g_ground_truth = json.load(f)

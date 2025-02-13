@@ -182,7 +182,7 @@ class RealTimeVideoProcess:
 
                 self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path, counter)
 
-                start_time = end_time + 1
+                start_time = end_time
                 counter += 1
         
         # Process any leftover from [end_time+1, final timestamp]
@@ -194,7 +194,7 @@ class RealTimeVideoProcess:
 
             self.vector_population_worker.add_task(video_url, start_time, end_time, vid_output_file_path, text_output_file_path, counter)
 
-            start_time = end_time + 1
+            start_time = end_time
             counter += 1
         
         log.info("waiting for the completion of vector population worker")
