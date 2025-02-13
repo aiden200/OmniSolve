@@ -1,21 +1,8 @@
 import cv2
 import numpy as np
 import os
+import matplotlib.pyplot as plt
 
-########################################################
-# 1. DEFINE YOUR SUBCLIPS INFO AND FPS
-########################################################
-
-# Example subclip metadata:
-# Each dict has:
-#   "path": path to the subclip file (already generated)
-#   "start": start time in seconds (relative to original)
-#   "end": end time in seconds (relative to original)
-subclips = [
-    {"path": "0_aaa.mp4", "start": 0,   "end": 10},   # covers [0..10s)
-    {"path": "1_aaa.mp4", "start": 10, "end": 20},   # covers [10..20s)
-    {"path": "2_aaa.mp4", "start": 20, "end": 30},   # covers [20..30s), etc.
-]
 
 
 def get_video_info_opencv(video_path):
@@ -53,20 +40,7 @@ def get_video_duration(video_path):
 
     return duration
 
-# Original video path
-original_video_path = "aaa.mp4"
 
-# Assume original video is 30 fps
-fps_original = 30
-
-# Typically subclips will keep the same fps, but if they differ:
-# you could store that in each subclip dict as "fps_subclip" 
-# or measure it with cv2/ffprobe. Here we assume it's the same:
-fps_subclip = fps_original
-
-########################################################
-# 2. HELPER FUNCTION: EXTRACT FRAME FROM A VIDEO
-########################################################
 
 def extract_frame_from_video(video_path, frame_index):
     """
@@ -124,10 +98,10 @@ def get_video_info_opencv(video_path):
     return fps, duration
 
 
-def find_subclip_and_local_frame(original_frame_idx, subclip_path, fps_orig):
+def find_subclip_and_local_frame(original_frame_idx, subclip_folder, fps_orig):
     """
     Given an original frame index (0-based) in the original video,
-    returns (subclip_path, local_frame_index) for the correct subclip,
+    returns (subclip_folder, local_frame_index) for the correct subclip,
     or (None, None) if not found.
     """
     time_in_seconds = original_frame_idx / fps_orig
@@ -137,20 +111,22 @@ def find_subclip_and_local_frame(original_frame_idx, subclip_path, fps_orig):
 
     start_time = 0
 
-    while os.path.exists(os.path.join(subclip_path, f"{i}.mp4")):
-        subclip_path = os.path.join(subclip_path, f"{i}.mp4")
+    while os.path.exists(os.path.join(subclip_folder, f"{i}.mp4")):
+        subclip_path = os.path.join(subclip_folder, f"{i}.mp4")
         subclip_fps, clip_duration = get_video_info_opencv(subclip_path)
         
         results.append({
             "path": subclip_path,
-            "start_time": start_time,
-            "end_time": start_time + clip_duration,
+            "start": start_time,
+            "end": start_time + clip_duration,
             "fps": subclip_fps
+            # "fps": fps_orig
         })
 
-        start_time = start_time + clip_duration
+        start_time = start_time + clip_duration + 1
+        i += 1
     
-
+    # print(results)
     
     # Find which subclip interval covers this time
     for clip_info in results:
@@ -183,7 +159,7 @@ def extract_frame_from_subclips(original_video_path, subclip_path, fps_orig, ori
     
     # Now actually extract from subclip
     frame, fps = extract_frame_from_video(subclip_path, local_frame_idx)
-    return frame
+    return frame, subclip_path
 
 
 
@@ -209,7 +185,7 @@ def test_frame_extraction(original_video_path, subclip_path, original_frame_idx)
 
 
     # (B) Extract via subclip approach
-    subclip_frame = extract_frame_from_subclips(original_video_path, subclip_path, fps_orig, original_frame_idx)
+    subclip_frame, subclip_path = extract_frame_from_subclips(original_video_path, subclip_path, fps_orig, original_frame_idx)
     if subclip_frame is None:
         print("Failed to extract via subclip. Possibly out of range.")
         return
@@ -222,12 +198,39 @@ def test_frame_extraction(original_video_path, subclip_path, original_frame_idx)
     # For a simple pixel-wise check (BGR difference):
     diff = cv2.absdiff(original_frame, subclip_frame)
     num_diff = np.sum(diff)
+
+    original_frame_rgb = cv2.cvtColor(original_frame, cv2.COLOR_BGR2RGB)
+    subclip_frame_rgb = cv2.cvtColor(subclip_frame, cv2.COLOR_BGR2RGB)
+
+    fig, axes = plt.subplots(1, 3, figsize=(15, 5))
+
+    axes[0].imshow(original_frame_rgb)
+    axes[0].set_title("Original Video Frame")
+    axes[0].axis("off")
+
+    axes[1].imshow(subclip_frame_rgb)
+    axes[1].set_title("Extracted Frame from Subclip")
+    axes[1].axis("off")
+
+    print(f"Subclip in question: {subclip_path}")
+
+    if num_diff == 0:
+        print("✅ Frames match perfectly!")
+    else:
+        print(f"⚠️ Frames differ by pixel difference sum = {num_diff}")
+
+        # Display heatmap of differences
+        diff_gray = cv2.cvtColor(diff, cv2.COLOR_BGR2GRAY)
+        axes[2].imshow(diff_gray, cmap="hot")
+        axes[2].set_title("Difference Heatmap")
+        axes[2].axis("off")
     if num_diff == 0:
         print("Frames match perfectly!")
     else:
         # Some differences might exist due to re-encoding, but hopefully minimal
         print(f"Frames differ by sum of pixel abs differences = {num_diff}")
         # You could implement a threshold check if needed.
+    plt.show()
 
 ########################################################
 # 6. EXAMPLE USAGE
@@ -235,8 +238,11 @@ def test_frame_extraction(original_video_path, subclip_path, original_frame_idx)
 
 if __name__ == "__main__":
     # Example: we want to check frames #100, #223 from the original
-    frames_to_test = [100, 223]
-    original_video_path = "/data/multivent_yt_videos/0vKs4-EZ_D0.mp4"
-    subclip_path = "/data/multivent_processed/0vKs4-EZ_D0"
+    frames_to_test = [110, 122, 200, 300, 400, 490, 800, 1200]
+    frames_to_test = [1000]
+
+    vid_name = "Dk1y6G7hhUo"
+    original_video_path = f"/data/multivent_yt_videos/{vid_name}.mp4"
+    subclip_path = f"/data/multivent_processed/{vid_name}"
     for f_idx in frames_to_test:
         test_frame_extraction(original_video_path, subclip_path, f_idx)
