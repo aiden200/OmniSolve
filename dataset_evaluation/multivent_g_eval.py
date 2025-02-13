@@ -2,6 +2,7 @@ import json, os
 from langchain_community.embeddings import SentenceTransformerEmbeddings
 from sklearn.metrics.pairwise import cosine_similarity
 from depth_extraction.extract_depth import DepthCalculator
+from dataset_evaluation.visualize_charts import *
 from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
@@ -10,11 +11,19 @@ import cv2
 import math
 from collections import defaultdict
 
-def compute_iou(bbox1, bbox2):
+def compute_iou(bbox1, bbox2, evaluation):
     """
     Computes the Intersection-over-Union (IoU) of two bounding boxes.
     Each bbox is a list in the form [x1, y1, x2, y2].
     """
+
+    if evaluation == "gemini":
+        # Some reason Gemini normalizes by 10 times more
+        bbox2[0] = bbox2[0] / 10 
+        bbox2[1] = bbox2[1] / 10 
+        bbox2[2] = bbox2[2] / 10 
+        bbox2[3] = bbox2[3] / 10 
+
     x1 = max(bbox1[0], bbox2[0])
     y1 = max(bbox1[1], bbox2[1])
     x2 = min(bbox1[2], bbox2[2])
@@ -78,49 +87,6 @@ def frame_depth_level(frame, depth_extractor: DepthCalculator):
     depth = depth_extractor.extract_image_depth(frame)
     return depth
 
-
-
-def visualize_metrics(evaluation_metrics):
-    overall_metrics = evaluation_metrics["overall_metrics"]
-    video_metrics = evaluation_metrics["video_metrics"]
-    
-    # Plot overall metrics.
-    labels = ["Recall", "Precision", "Avg Semantic Similarity"]
-    values = [
-        overall_metrics["overall_recall"],
-        overall_metrics["overall_precision"],
-        overall_metrics["overall_avg_sem_sim"]
-    ]
-    plt.figure(figsize=(8, 6))
-    plt.bar(labels, values, color=["blue", "green", "orange"])
-    plt.ylim(0, 1)
-    plt.title("Overall Metrics")
-    plt.show()
-    
-    # Plot per-video metrics.
-    videos = list(video_metrics.keys())
-    recalls = [video_metrics[v]["recall"] for v in videos]
-    precisions = [video_metrics[v]["precision"] for v in videos]
-    avg_sem_sims = [video_metrics[v]["avg_sem_sim"] for v in videos]
-    
-    plt.figure(figsize=(10, 8))
-    
-    plt.subplot(3, 1, 1)
-    plt.bar(videos, recalls, color="blue")
-    plt.ylabel("Recall")
-    plt.title("Per-Video Metrics")
-    
-    plt.subplot(3, 1, 2)
-    plt.bar(videos, precisions, color="green")
-    plt.ylabel("Precision")
-    
-    plt.subplot(3, 1, 3)
-    plt.bar(videos, avg_sem_sims, color="orange")
-    plt.ylabel("Avg Semantic Similarity")
-    plt.xticks(rotation=45)
-    
-    plt.tight_layout()
-    plt.show()
 
 
 
@@ -235,6 +201,9 @@ def evaluate_multivent_g(result_dir,
             frame_number = obj["frame"]
             gt_frames[frame_number].append(obj)
         
+        # Video missing due to corruption
+        if video not in predictions:
+            continue
 
         # Organize predictions by frame.
         video_predictions = predictions[video]
@@ -277,8 +246,7 @@ def evaluate_multivent_g(result_dir,
             # Loop over all GT and predictions.
             for i, gt_obj in enumerate(frame_gt_objects):
                 for j, pred_obj in enumerate(frame_pred_objects):
-                    iou = compute_iou(gt_obj["bbox"], pred_obj["bbox"])
-                    print(iou)
+                    iou = compute_iou(gt_obj["bbox"], pred_obj["bbox"], evaluation)
                     if iou >= threshold:
                         gt_matches[i] = True
                         pred_matches[j] = True
@@ -385,8 +353,9 @@ def evaluate_multivent_g(result_dir,
 
     # Optionally visualize the metrics.
     if visualize:
-        visualize_metrics(evaluation_metrics)
-    
+        visualize_metrics(evaluation, evaluation_metrics)
+        visualize_aggregated_categories(evaluation, aggregated_by_category)
+
     return evaluation_metrics
 
 
