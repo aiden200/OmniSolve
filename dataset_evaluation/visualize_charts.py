@@ -11,7 +11,10 @@ def visualize_continuous_category(evaluation, category_name, data):
     """
     # Sort data by the category value.
     sorted_items = sorted(data.items(), key=lambda x: x[0])
-    xs = [x[0] for x in sorted_items]
+    # if category_name == "confidence":
+    #     print(sorted_items)
+    #     exit(0)
+    xs = [float(x[0]) for x in sorted_items]  # Convert keys to float
     avg_precision = [x[1]["avg_precision"] for x in sorted_items]
     avg_recall = [x[1]["avg_recall"] for x in sorted_items]
     avg_sem_sim = [x[1]["avg_sem_sim"] for x in sorted_items]
@@ -33,6 +36,8 @@ def visualize_continuous_category(evaluation, category_name, data):
         ax.set_ylabel(metric_name)
         ax.set_title(f"{metric_name} vs {category_name}")
         ax.legend()
+
+            
     fig.tight_layout()
     plt.savefig(f'benchmark_results/{evaluation}_{category_name}.png')
     plt.show()

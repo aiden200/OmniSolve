@@ -7,6 +7,7 @@ from collections import defaultdict
 import matplotlib.pyplot as plt
 import numpy as np
 import cv2
+from tqdm import tqdm
 
 import math
 from collections import defaultdict
@@ -180,7 +181,7 @@ def evaluate_multivent_g(result_dir,
     video_metrics = {}
     
     #TODO: Get rid of this
-    videos = ["EDLy6c3jH8U"]
+    # videos = ["EDLy6c3jH8U"]
 
     # Load evaluation results 
     if evaluation == "gemini":
@@ -188,7 +189,7 @@ def evaluate_multivent_g(result_dir,
             predictions = json.load(f)
         
     
-    for video in videos:
+    for video in tqdm(videos):
         video_load_path = os.path.join(multivent_yt_path, f"{video}.mp4")
         video_path = os.path.join(result_dir, video)
         video_ground_truth = multivent_g_ground_truth.get(video, {})
@@ -359,6 +360,18 @@ def evaluate_multivent_g(result_dir,
     return evaluation_metrics
 
 
+def rerun_visualization(evaluation):
+    with open("benchmark_results/evaluation_metrics.json", "r") as f:
+        evaluation_metrics = json.load(f)
+    
+    with open("benchmark_results/category_evaluation.json", "r") as f:
+        aggregated_by_category = json.load(f)
+
+
+    visualize_metrics(evaluation, evaluation_metrics)
+    visualize_aggregated_categories(evaluation, aggregated_by_category)
+
+
 
 
 result_dir = "/data/multivent_processed/"
@@ -369,6 +382,7 @@ evaluation_file = "benchmark_results/gemini_results.json"
 threshold = .1
 
 
-evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
+# evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
 # aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
 # print(json.dumps(aggregated_by_category, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o))
+rerun_visualization(evaluation)
