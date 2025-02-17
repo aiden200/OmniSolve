@@ -164,8 +164,11 @@ class RealTimeVideoProcess:
         start_time = 0
         end_time = 0
 
+        frame_output_filepath = os.path.join(output_dir, f"frame.txt")
+        with open(frame_output_filepath, "w") as f:
+            f.write("")
 
-        for timestamp, response, informative_score, relevance_score, frame, additional_info in self.timestampExtracter.start_chat(video_url):
+        for timestamp, response, informative_score, relevance_score, frame, frame_idx, frame_fps in self.timestampExtracter.start_chat(video_url):
             # print("frame is in")
             # if frame is not None:
             #     cv2.imshow("Debug Video Playback", frame)
@@ -174,9 +177,11 @@ class RealTimeVideoProcess:
                 # if cv2.waitKey(30) & 0xFF == ord('q'):
                 #     print("User requested exit from debug video window.")
                 #     break
+            with open(frame_output_filepath, "a") as f:
+                f.write(f"{counter},{timestamp},{frame_idx},{frame_fps}\n")
             
             if response:
-                end_time = timestamp - 1  # once the llm switched to a new scene it's too late
+                end_time = timestamp  # once the llm switched to a new scene it's too late
                 vid_output_file_path = os.path.join(output_dir, f"{counter}.mp4")
                 text_output_file_path = os.path.join(output_dir, f"{counter}.txt")
 
@@ -225,7 +230,8 @@ def write_to_check_file(checkfile, status, new_element):
 if __name__ == '__main__':
     video_directory = "/data/multivent_yt_videos/"
     json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
-    output_dir = "/data/multivent_processed"
+    # output_dir = "/data/multivent_processed"
+    output_dir = "/data/multivent_processed_without_delay"
     
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
