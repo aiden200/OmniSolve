@@ -184,7 +184,7 @@ def evaluate_multivent_g(result_dir,
     # videos = ["EDLy6c3jH8U"]
 
     # Load evaluation results 
-    if evaluation == "gemini":
+    if evaluation == "gemini" or evaluation == "omnisolve":
         with open(evaluation_file, "r") as f:
             predictions = json.load(f)
         
@@ -343,12 +343,12 @@ def evaluate_multivent_g(result_dir,
     }
     
     # Save the evaluation metrics to a JSON file.
-    with open("benchmark_results/evaluation_metrics.json", "w") as f:
+    with open(f"benchmark_results/{evaluation}_evaluation_metrics.json", "w") as f:
         json.dump(evaluation_metrics, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
     
 
     aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
-    with open("benchmark_results/category_evaluation.json", "w") as f:
+    with open(f"benchmark_results/{evaluation}_category_evaluation.json", "w") as f:
         json.dump(aggregated_by_category, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
 
 
@@ -377,12 +377,13 @@ def rerun_visualization(evaluation):
 result_dir = "/data/multivent_processed/"
 multivent_g_json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
 multivent_yt_path = "/data/multivent_yt_videos/"
-evaluation = "gemini"
-evaluation_file = "benchmark_results/gemini_results.json"
+evaluation = "omnisolve"
+# evaluation_file = "benchmark_results/gemini_results.json"
+evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omniverse_formatted.json"
 threshold = .1
 
 
-# evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
-# aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
+evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
+aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
 # print(json.dumps(aggregated_by_category, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o))
-rerun_visualization(evaluation)
+# rerun_visualization(evaluation)

@@ -1,0 +1,815 @@
+{
+    "description": "The opening of the floodgates of the Ross River dam in Queensland created what Australia's weather bureau called \"dangerous and high velocity flows\". With the dam at more than 300 percent capacity, engineers said they had no option.\n\nDownstream homes in the coastal city of Townsville are flooded and more than a thousand people have moved to safety and been evacuated from their homes.\nIn some parts of Townsville, salt-water crocodiles displaced by the floodwaters have been spotted, adding extra risk and danger. \n\nAl Jazeera's Bernard Smith reports.\n\n- Subscribe to our channel: http://aje.io/AJSubscribe \n- Follow us on Twitter: https://twitter.com/AJEnglish \n- Find us on Facebook: https://www.facebook.com/aljazeera \n- Check our website: https://www.aljazeera.com/\n\n#AlJazeeraEnglish #Australia #Floods",
+    "event_type": "emergency",
+    "template": {
+        "what": "What emergency/disaster is occurring/has occurred?",
+        "where": "Where is the emergency/disaster occurring?",
+        "when": "When did the emergency/disaster occur?",
+        "outcome-occurred": "What was the outcome of the emergency/disaster?",
+        "who-affected": "Who was affected by the emergency/disaster?",
+        "emergency-response": "Who is responding to assist those affected by the emergency/disaster?"
+    },
+    "metadata": {
+        "language": "english",
+        "vid_source": null,
+        "vid_len": null,
+        "text_len": 809
+    },
+    "text": [
+        {
+            "role": "what",
+            "text": "opening of the floodgates",
+            "index": [
+                4,
+                29
+            ]
+        },
+        {
+            "role": "what",
+            "text": "dangerous and high velocity flows",
+            "index": [
+                114,
+                147
+            ]
+        },
+        {
+            "role": "what",
+            "text": "floodwaters",
+            "index": [
+                455,
+                466
+            ]
+        },
+        {
+            "role": "where",
+            "text": "Queensland",
+            "index": [
+                55,
+                65
+            ]
+        },
+        {
+            "role": "where",
+            "text": "Ross River dam",
+            "index": [
+                37,
+                51
+            ]
+        },
+        {
+            "role": "where",
+            "text": "the coastal city of Townsville",
+            "index": [
+                254,
+                284
+            ]
+        },
+        {
+            "role": "where",
+            "text": "Townsville",
+            "index": [
+                404,
+                414
+            ]
+        },
+        {
+            "role": "where",
+            "text": "#Australia",
+            "index": [
+                791,
+                801
+            ]
+        },
+        {
+            "role": "what",
+            "text": "#Floods",
+            "index": [
+                802,
+                809
+            ]
+        },
+        {
+            "role": "where",
+            "text": "Australia",
+            "index": [
+                79,
+                88
+            ]
+        },
+        {
+            "role": "what",
+            "text": "the dam at more than 300 percent capacity",
+            "index": [
+                155,
+                196
+            ]
+        },
+        {
+            "role": "emergency-response",
+            "text": "engineers",
+            "index": [
+                198,
+                207
+            ]
+        },
+        {
+            "role": "who-affected",
+            "text": "more than a thousand people",
+            "index": [
+                301,
+                328
+            ]
+        },
+        {
+            "role": "what",
+            "text": "flooded",
+            "index": [
+                289,
+                296
+            ]
+        },
+        {
+            "role": "emergency-response",
+            "text": "have moved to safety and been evacuated from their homes",
+            "index": [
+                329,
+                385
+            ]
+        },
+        {
+            "role": "who-affected",
+            "text": "salt-water crocodiles",
+            "index": [
+                416,
+                437
+            ]
+        },
+        {
+            "role": "where",
+            "text": "Downstream homes",
+            "index": [
+                234,
+                250
+            ]
+        },
+        {
+            "role": "emergency-response",
+            "text": "Bernard Smith",
+            "index": [
+                531,
+                544
+            ]
+        },
+        {
+            "role": "emergency-response",
+            "text": "weather bureau ",
+            "index": [
+                91,
+                106
+            ]
+        }
+    ],
+    "temporal": [
+        {
+            "role": "what",
+            "time": [
+                0.057043415813424314,
+                7.646045977429071
+            ],
+            "certainty": null
+        },
+        {
+            "role": "where",
+            "time": [
+                14.833516369920542,
+                18.655425229419976
+            ],
+            "certainty": null
+        },
+        {
+            "role": "emergency-response",
+            "time": [
+                18.598381813606547,
+                46.093308235677085
+            ],
+            "certainty": null
+        },
+        {
+            "role": "who-affected",
+            "time": [
+                18.65542522941997,
+                36.68114462646206
+            ],
+            "certainty": null
+        },
+        {
+            "role": "who-affected",
+            "time": [
+                39.64740224876013,
+                46.26443848311736
+            ],
+            "certainty": null
+        },
+        {
+            "role": "what",
+            "time": [
+                46.036264819863646,
+                50.48565125331075
+            ],
+            "certainty": null
+        },
+        {
+            "role": "emergency-response",
+            "time": [
+                50.20043417424363,
+                75.52771079540405
+            ],
+            "certainty": null
+        },
+        {
+            "role": "who-affected",
+            "time": [
+                50.37156442168391,
+                75.52771079540405
+            ],
+            "certainty": null
+        },
+        {
+            "role": "what",
+            "time": [
+                75.38510225587048,
+                80.57605309489209
+            ],
+            "certainty": null
+        },
+        {
+            "role": "where",
+            "time": [
+                80.51900967907866,
+                83.56860416666666
+            ],
+            "certainty": null
+        }
+    ],
+    "spatial": [
+        {
+            "role": "what",
+            "entity": "floodgates", 
+            "frame": 3,
+            "bbox": [
+                1.7656233996516904,
+                27.833333333333098,
+                82.5780455160363,
+                55.66666666666579
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "what",
+            "entity": "a part of a text banner saying \"floods\"",
+            "frame": 58,
+            "bbox": [
+                62.42187500000001,
+                77.83333333333333,
+                79.015625,
+                88.33333333333333
+            ],
+            "certainty": 5,
+            "ocr_flag": true
+        },
+        {
+            "role": "what",
+            "entity": "a part of the text banner saying \"northern australia under water\"",
+            "frame": 58,
+            "bbox": [
+                22.671875000000004,
+                88.66666666666666,
+                70.859375,
+                93.99999999999999
+            ],
+            "certainty": 5,
+            "ocr_flag": true
+        },
+        {
+            "role": "what",
+            "entity": "flowing water",
+            "frame": 131,
+            "bbox": [
+                3.921875000000004,
+                31.5,
+                97.01562500000001,
+                79.5
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "what",
+            "entity": "dam water",
+            "frame": 182,
+            "bbox": [
+                4.015627667247055,
+                10.33333333333333,
+                93.45312766724705,
+                73.49999999999999
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "where",
+            "entity": "flooded houses",
+            "frame": 378,
+            "bbox": [
+                11.046875000000004,
+                7.166666666666666,
+                80.703125,
+                60.66666666666666
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "bald man on raft",
+            "frame": 466,
+            "bbox": [
+                58.01562500000001,
+                30.666666666666664,
+                70.01562500000001,
+                64.5
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "woman on raft",
+            "frame": 466,
+            "bbox": [
+                79.39062286620235,
+                37,
+                85.48437286620235,
+                50.333333333333336
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "Raft drivers",
+            "frame": 466,
+            "bbox": [
+                61.95315914076157,
+                23.833333333333186,
+                79.01559726062996,
+                58.33333333333264
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "Officer",
+            "frame": 541,
+            "bbox": [
+                65.890625,
+                1.3333333333333333,
+                99.35937500000001,
+                30.999999999999996
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "Officer",
+            "frame": 541,
+            "bbox": [
+                32.98437500000001,
+                2.166666666666667,
+                52.765625,
+                22.833333333333336
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "interpreter",
+            "frame": 541,
+            "bbox": [
+                21.265625000000004,
+                18.333333333333332,
+                46.296875,
+                58.66666666666666
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "mayor",
+            "frame": 587,
+            "bbox": [
+                62.42187500000001,
+                13.833333333333334,
+                85.765625,
+                73.99999999999999
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "text banner describing either woman or female-presenting individual speaking. jenny hill, townsville mayor.",
+            "frame": 587,
+            "bbox": [
+                23.046875000000007,
+                81.16666666666667,
+                53.234375,
+                92.0
+            ],
+            "certainty": 4,
+            "ocr_flag": true
+        },
+        {
+            "role": "who-affected",
+            "entity": "group of people",
+            "frame": 587,
+            "bbox": [
+                14.890625000000005,
+                5.666666666666666,
+                100.203125,
+                56.166666666666664
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "distressed individuals",
+            "frame": 846,
+            "bbox": [
+                43.203125,
+                12.666666666666668,
+                66.734375,
+                72.16666666666667
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "emergency worker",
+            "frame": 846,
+            "bbox": [
+                68.328125,
+                4.666666666666667,
+                88.671875,
+                57.49999999999999
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "emergency worker",
+            "frame": 846,
+            "bbox": [
+                26.328125000000004,
+                22.666666666666664,
+                44.421875,
+                61.49999999999999
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "emergency worker",
+            "frame": 857,
+            "bbox": [
+                62.890613797562345,
+                18.999999999999996,
+                77.23436379756234,
+                42.999999999999986
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "firetruck in flood",
+            "frame": 925,
+            "bbox": [
+                13.578125000000002,
+                4.333333333333334,
+                92.70312499999999,
+                83.16666666666666
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "woman with children",
+            "frame": 991,
+            "bbox": [
+                30.921875,
+                23.333333333333332,
+                59.140625,
+                62.0
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "rescue team raft",
+            "frame": 1015,
+            "bbox": [
+                47.703125,
+                7.666666666666666,
+                91.859375,
+                37.333333333333336
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "Raft",
+            "frame": 1104,
+            "bbox": [
+                37.203125,
+                6.666666666666667,
+                67.859375,
+                49.0
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "rescue team",
+            "frame": 1104,
+            "bbox": [
+                72.546875,
+                20.666666666666664,
+                93.359375,
+                57.833333333333336
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "what",
+            "entity": "flooded truck",
+            "frame": 1181,
+            "bbox": [
+                3.828123933101176,
+                18.999999999999996,
+                97.67187393310118,
+                85.83333333333333
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "ASL interpreter",
+            "frame": 1311,
+            "bbox": [
+                26.609375,
+                18.333333333333332,
+                51.359375,
+                69.33333333333333
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "woman",
+            "frame": 1311,
+            "bbox": [
+                67.29685846306823,
+                15.5,
+                84.82810846306823,
+                56.0
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "federal employees",
+            "frame": 1311,
+            "bbox": [
+                52.953125,
+                5.666666666666666,
+                100.671875,
+                39.166666666666664
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "text banner describing the woman or female-presenting individual speaking. \"anastasia palaszczuk, queensland state premier\"",
+            "frame": 1311,
+            "bbox": [
+                22.578125533449402,
+                81.16666666666664,
+                74.6093755334494,
+                92.33333333333331
+            ],
+            "certainty": 4,
+            "ocr_flag": true
+        },
+        {
+            "role": "who-affected",
+            "entity": "representatives",
+            "frame": 1317,
+            "bbox": [
+                20.515625,
+                7.999999999999999,
+                103.39062500000001,
+                61.99999999999999
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "boat rescue",
+            "frame": 1620,
+            "bbox": [
+                32.79698489057854,
+                14.499999999999647,
+                65.51558605819238,
+                37.499999999999176
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "man in uniform",
+            "frame": 1620,
+            "bbox": [
+                85.296875,
+                24.333333333333332,
+                99.078125,
+                60.0
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "men",
+            "frame": 1620,
+            "bbox": [
+                80.796875,
+                3.4999999999999996,
+                101.140625,
+                22.5
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "men with boat",
+            "frame": 1620,
+            "bbox": [
+                58.859375,
+                3.833333333333333,
+                83.703125,
+                31.166666666666664
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "man wading",
+            "frame": 1667,
+            "bbox": [
+                59.51562500000001,
+                14.499999999999998,
+                71.328125,
+                63.166666666666664
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "camouflage guide",
+            "frame": 1667,
+            "bbox": [
+                24.546875000000004,
+                10.333333333333332,
+                40.109375,
+                64.66666666666667
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "individuals",
+            "frame": 1667,
+            "bbox": [
+                42.82812446655059,
+                9.666666666666666,
+                50.0468744665506,
+                42.33333333333333
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "emergency-response",
+            "entity": "man holding person",
+            "frame": 1667,
+            "bbox": [
+                51.546875,
+                16.5,
+                60.73437499999999,
+                74.33333333333333
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "elderly/disabled",
+            "frame": 1680,
+            "bbox": [
+                35.609373399651766,
+                16.666666666666664,
+                63.07812339965176,
+                56.99999999999999
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "people",
+            "frame": 1761,
+            "bbox": [
+                39.171875,
+                42.166666666666664,
+                63.921875,
+                60.33333333333333
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "who-affected",
+            "entity": "flood wading",
+            "frame": 1818,
+            "bbox": [
+                41.890625,
+                18.166666666666664,
+                75.921875,
+                83.5
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "what",
+            "entity": "flooded suburb",
+            "frame": 1896,
+            "bbox": [
+                5.046875000000003,
+                24.833333333333332,
+                98.328125,
+                93.0
+            ],
+            "certainty": 3,
+            "ocr_flag": false
+        },
+        {
+            "role": "where",
+            "entity": "flooded town",
+            "frame": 2032,
+            "bbox": [
+                14.140625000000002,
+                16.333333333333332,
+                90.921875,
+                84.16666666666666
+            ],
+            "certainty": 4,
+            "ocr_flag": false
+        }
+    ]
+}

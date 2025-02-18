@@ -31,7 +31,6 @@ detection = {
 }
 
 
-
 def load_frame_as_pil(video_path, frame_number):
     # Open the video
     cap = cv2.VideoCapture(video_path)

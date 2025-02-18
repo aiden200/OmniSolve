@@ -4,6 +4,7 @@ import os
 import matplotlib.pyplot as plt
 import json
 from tqdm import tqdm
+import subprocess
 
 
 def get_video_info_opencv(video_path):
@@ -106,7 +107,7 @@ def find_matching_frame(original_video_path, subclip_video_folder, original_fram
     if not original_frame_indexes:
         # print(original_video_path, original_frame_indexes)
         # exit(0)
-        return 0, current_info
+        return 1, current_info
     target_frame= extract_frame_from_video(original_video_path, original_frame_indexes[index_of_frames])[0]
     # try:
     #     target_frame = extract_frame_from_video(original_video_path, original_frame_indexes[index_of_frames])[0]
@@ -168,7 +169,11 @@ def find_matching_frame(original_video_path, subclip_video_folder, original_fram
         i += 1
         cap.release()
 
-    
+    # TODO: This might need a fix
+    if index_of_frames != 0:
+        return 1, current_info
+    print(index_of_frames, len(original_frame_indexes), original_frame_indexes)
+
     return -1, None
 
 
@@ -340,6 +345,8 @@ def multivent_g_find_frames(multivent_g_path, subclip_path, original_video_path,
     with open(multivent_g_path, "r") as f:
         gt_data = json.load(f)
     
+    count = 0
+    
     for video in tqdm(gt_data):
         # try:
         video_subclip_path = os.path.join(subclip_path, video)
@@ -351,26 +358,56 @@ def multivent_g_find_frames(multivent_g_path, subclip_path, original_video_path,
                     frame_idxs.append(object["frame"])
             
             frame_idxs.sort()
+            try:
+                status, frame_info = find_matching_frame(video_path, video_subclip_path, frame_idxs, visualize=False)
+            except Exception:
+                # Convert frame back into a good one
+                new_video_path = os.path.join(original_video_path, f"{video}_converted.mp4")
+                print(new_video_path)
+                cmd = [
+                    "ffmpeg",
+                    "-y",               # Overwrite output file if it exists
+                    "-i", video_path,   # Input file
+                    "-c:v", "libx264",  # Use H.264 codec for video
+                    "-c:a", "copy",     # Copy audio stream without re-encoding (optional)
+                    new_video_path
+                ]
 
-            status, frame_info = find_matching_frame(video_path, video_subclip_path, frame_idxs, visualize=False)
+                subprocess.run(cmd, check=True)
+                status, frame_info = find_matching_frame(new_video_path, video_subclip_path, frame_idxs, visualize=False)
+            # print(status, frame_info)
+            print(video, video_path)
             if status == 1:
                 data[video] = frame_info
 
                 with open(savefile_path, "w") as f:
                     json.dump(data, f, indent=2)
+            count += 1
         elif video in data:
-            print(f"video {video} already loaded")
+            # print(f"video {video} already loaded")
+            count += 1
         # except Exception as e:
         #     print(e)
-    print(f"Processed: {len(data)} frame conversion data")
+    print(f"Processed: {len(data)} frame conversion data. Total: {count}")
 
 
 def check_counter_of_files_multivent_g(subclip_path):
-    pass
+    finished_files = set()
+    status_file = os.path.join(subclip_path, "status.txt")
+    with open(status_file, "r") as f:
+        files = f.readlines()
+        for names in files:
+            name = names.split("/")[3]
+            finished_files.add(name)
+
+    print(f"Processed: {len(finished_files)} clips and {len(files)} clips")
+
+
 
 
 
 if __name__ == "__main__":
+    # check_counter_of_files_multivent_g("/data/multivent_processed_without_delay")
     multivent_g_path = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
     subclip_path = "/data/multivent_processed_without_delay"
     original_video_path = "/data/multivent_yt_videos"
