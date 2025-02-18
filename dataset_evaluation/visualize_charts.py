@@ -129,3 +129,130 @@ def visualize_metrics(evaluation, evaluation_metrics):
     plt.tight_layout()
     plt.savefig(f'benchmark_results/{evaluation}_per_video_metrics.png')
     plt.show()
+
+
+
+
+def compare_continuous_category(evaluation1, evaluation2, category_name, data1, data2):
+    """
+    Compare two continuous categories (regression charts) for performance metrics.
+    
+    Parameters:
+      - evaluation1, evaluation2: str, names/labels for the two evaluation results.
+      - category_name: str, name of the category (e.g. "confidence", "depth", etc.)
+      - data1, data2: dicts, mapping category value to a dict with keys "avg_precision", 
+        "avg_recall", "avg_sem_sim", and "count".
+    """
+    # Sort data by the category value.
+    sorted_data1 = sorted(data1.items(), key=lambda x: float(x[0]))
+    sorted_data2 = sorted(data2.items(), key=lambda x: float(x[0]))
+    
+    xs1 = [float(item[0]) for item in sorted_data1]
+    xs2 = [float(item[0]) for item in sorted_data2]
+    
+    precision1 = [item[1]["avg_precision"] for item in sorted_data1]
+    recall1    = [item[1]["avg_recall"] for item in sorted_data1]
+    semsim1    = [item[1]["avg_sem_sim"] for item in sorted_data1]
+    
+    precision2 = [item[1]["avg_precision"] for item in sorted_data2]
+    recall2    = [item[1]["avg_recall"] for item in sorted_data2]
+    semsim2    = [item[1]["avg_sem_sim"] for item in sorted_data2]
+    
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+    metrics = [
+        ("Precision", precision1, precision2),
+        ("Recall",    recall1,    recall2),
+        ("Semantic Similarity", semsim1, semsim2)
+    ]
+    
+    colors = {evaluation1: "blue", evaluation2: "green"}
+    
+    for ax, (metric_name, y1, y2) in zip(axs, metrics):
+        # Plot evaluation1
+        ax.scatter(xs1, y1, color=colors[evaluation1], label=f"{evaluation1} Data")
+        if len(xs1) >= 2:
+            coeffs1 = np.polyfit(xs1, y1, 1)
+            poly_eqn1 = np.poly1d(coeffs1)
+            x_fit1 = np.linspace(min(xs1), max(xs1), 100)
+            y_fit1 = poly_eqn1(x_fit1)
+            ax.plot(x_fit1, y_fit1, color=colors[evaluation1], linestyle="--", label=f"{evaluation1} Regression")
+        
+        # Plot evaluation2
+        ax.scatter(xs2, y2, color=colors[evaluation2], label=f"{evaluation2} Data")
+        if len(xs2) >= 2:
+            coeffs2 = np.polyfit(xs2, y2, 1)
+            poly_eqn2 = np.poly1d(coeffs2)
+            x_fit2 = np.linspace(min(xs2), max(xs2), 100)
+            y_fit2 = poly_eqn2(x_fit2)
+            ax.plot(x_fit2, y_fit2, color=colors[evaluation2], linestyle="--", label=f"{evaluation2} Regression")
+        
+        ax.set_xlabel(category_name)
+        ax.set_ylabel(metric_name)
+        ax.set_title(f"{metric_name} vs {category_name}")
+        ax.legend()
+        
+    fig.tight_layout()
+    plt.savefig(f'benchmark_results/compare_{evaluation1}_{evaluation2}_{category_name}.png')
+    plt.show()
+
+
+
+def compare_categorical_category(evaluation1, evaluation2, category_name, data1, data2):
+    """
+    Compare two categorical categories (bar charts) for performance metrics.
+    
+    Parameters:
+      - evaluation1, evaluation2: str, names/labels for the two evaluation results.
+      - category_name: str, name of the category (e.g., "role").
+      - data1, data2: dicts, mapping each category value to a dict with performance metrics.
+    """
+    # Sort data; we assume both results have the same categorical keys.
+    sorted_items = sorted(data1.items(), key=lambda x: x[0])
+    xs = [str(item[0]) for item in sorted_items]
+    
+    precision1 = [item[1]["avg_precision"] for item in sorted_items]
+    recall1    = [item[1]["avg_recall"] for item in sorted_items]
+    semsim1    = [item[1]["avg_sem_sim"] for item in sorted_items]
+    
+    # Assume keys in data2 match data1; otherwise, adjust accordingly.
+    precision2 = [data2[k]["avg_precision"] for k in xs]
+    recall2    = [data2[k]["avg_recall"] for k in xs]
+    semsim2    = [data2[k]["avg_sem_sim"] for k in xs]
+    
+    x_pos = np.arange(len(xs))
+    width = 0.35  # width of each bar
+    
+    fig, axs = plt.subplots(1, 3, figsize=(18, 5))
+    metrics = [
+        ("Precision", precision1, precision2),
+        ("Recall",    recall1,    recall2),
+        ("Semantic Similarity", semsim1, semsim2)
+    ]
+    
+    for ax, (metric_name, m1, m2) in zip(axs, metrics):
+        ax.bar(x_pos - width/2, m1, width=width, color="blue", label=evaluation1)
+        ax.bar(x_pos + width/2, m2, width=width, color="green", label=evaluation2)
+        ax.set_xlabel(category_name)
+        ax.set_ylabel(metric_name)
+        ax.set_title(f"{metric_name} by {category_name}")
+        ax.set_xticks(x_pos)
+        ax.set_xticklabels(xs)
+        ax.legend()
+    
+    fig.tight_layout()
+    plt.savefig(f'benchmark_results/compare_{evaluation1}_{evaluation2}_{category_name}.png')
+    plt.show()
+
+
+
+# def compare_aggregated_categories(evaluation1, evaluation2, aggregated1, aggregated2):
+#     """
+#     For each category in the aggregated dictionary, visualize the performance.
+#     For continuous categories, we show regression charts.
+#     For categorical ones (e.g., "role"), we show bar charts.
+#     """
+#     for category, data in aggregated1.items():
+#         if category == "role":
+#             compare_aggregated_categories(evaluation1,evaluation2, category, data)
+#         else:
+#             visualize_continuous_category(evaluation, category, data)
