@@ -24,13 +24,18 @@ def extract_json_between_markers(text, start_marker="```json", end_marker="```")
             print("Markers not found in the text.")
             return None
 
-def extract_relationship_for_video(video_folder, client, prompt):
+def extract_relationship_for_video(video_folder, client, prompt, debug=False):
 
     i = 0
     while os.path.exists(os.path.join(video_folder, f"{i}_RGS.mp4")):
         detection_file = os.path.join(video_folder, f"{i}_object_relationships.json")
         if os.path.exists(detection_file):
+            if debug:
+                print(f"File {detection_file} already exists")
+            i += 1
             continue
+        if debug:
+            print(f"On file {detection_file}")
         object_folder = os.path.join(video_folder, f"{i}_detection_results", "json_data")
         object_files = [f for f in os.listdir(object_folder)]
         object_files.sort()
@@ -63,7 +68,8 @@ def extract_relationship_for_video(video_folder, client, prompt):
         object_names_str = ""
         for instance_id in instance_keys:
             object_names_str = f"{object_names[instance_id]}, ID: {str(instance_id)}\n" + object_names_str
-
+        # if debug:
+        #     print("object")
 
         detected_video_file = os.path.join(video_folder, f"{i}_RGS.mp4")
         video_file = client.files.upload(file=detected_video_file)
@@ -114,7 +120,7 @@ def extract_relationships(multivent_processed_folder, debug=False):
     for video in tqdm(videos):
         if debug:
             print(video)
-        extract_relationship_for_video(video, client, prompt)
+        extract_relationship_for_video(video, client, prompt, debug)
 
 
 if __name__ == "__main__":
