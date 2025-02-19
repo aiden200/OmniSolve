@@ -234,6 +234,9 @@ def evaluate_multivent_g(result_dir,
             avg_depth = frame_depth_level(frame, depth_extractor)
             
             frame_gt_objects = gt_frames.get(frame_number, [])
+            if not frame_gt_objects:
+                continue
+            
             frame_pred_objects = pred_frames.get(frame_number, [])
             
             video_total_gt += len(frame_gt_objects)
@@ -259,10 +262,25 @@ def evaluate_multivent_g(result_dir,
             frame_detected_gt = sum(gt_matches)
             frame_detected_pred = sum(pred_matches)
             
-            # Frame-level recall and precision.
-            frame_recall = frame_detected_gt / len(frame_gt_objects) if frame_gt_objects else 0
-            frame_precision = frame_detected_pred / len(frame_pred_objects) if frame_pred_objects else 0
-            avg_sem_sim = np.mean(semantic_similarities) if semantic_similarities else 0
+            
+            # Video-level recall and precision.
+            if not frame_gt_objects:
+                # This is a negative frame (no GT objects)
+                if frame_pred_objects:
+                    # All predictions are false positives
+                    # false_positive_count += len(frame_pred_objects)
+                    frame_precision = 0  # Since none of the predictions are correct
+                else:
+                    # No predictions, so there are no false positives
+                    frame_precision = 1  # Perfect performance on negatives
+                # Recall is undefined because there are no GT objects; you could also choose to exclude this frame from recall averaging.
+                frame_recall = None  
+                avg_sem_sim = None  # Not applicable
+            else:
+                # Frame-level recall and precision.
+                frame_recall = frame_detected_gt / len(frame_gt_objects) if frame_gt_objects else 0
+                frame_precision = frame_detected_pred / len(frame_pred_objects) if frame_pred_objects else 0
+                avg_sem_sim = np.mean(semantic_similarities) if semantic_similarities else 0
             
             # Performance tuple for this frame.
             performance_tuple = (frame_precision, frame_recall, avg_sem_sim)
@@ -289,14 +307,14 @@ def evaluate_multivent_g(result_dir,
             video_detected_gt += frame_detected_gt
             video_detected_pred += frame_detected_pred
         
-        # Video-level recall and precision.
+
         video_recall = video_detected_gt / video_total_gt if video_total_gt > 0 else 0
         video_precision = video_detected_pred / video_total_pred if video_total_pred > 0 else 0
         video_avg_sem_sim = np.mean(video_sem_sims) if video_sem_sims else 0
         
-        print(f"Video: {video}")
-        print(f"  Retrieval Recall: {video_recall:.2f} (matched {video_detected_gt}/{video_total_gt})")
-        print(f"  Hallucination Precision: {video_precision:.2f} (matched {video_detected_pred}/{video_total_pred})")
+        # print(f"Video: {video}")
+        # print(f"  Retrieval Recall: {video_recall:.2f} (matched {video_detected_gt}/{video_total_gt})")
+        # print(f"  Hallucination Precision: {video_precision:.2f} (matched {video_detected_pred}/{video_total_pred})")
         
         video_metrics[video] = {
             "recall": video_recall,

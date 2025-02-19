@@ -227,12 +227,7 @@ def write_to_check_file(checkfile, status, new_element):
         file.write(f"{new_element},{str(status)}\n")
 
 
-if __name__ == '__main__':
-    video_directory = "/data/multivent_yt_videos/"
-    json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
-    # output_dir = "/data/multivent_processed"
-    output_dir = "/data/multivent_processed_without_delay"
-    
+def run_pipeline(video_dir, output_dir, json_file=None):
     if not os.path.exists(output_dir):
         os.mkdir(output_dir)
     
@@ -250,63 +245,124 @@ if __name__ == '__main__':
     te = TimestampExtracter(DEFAULT_MM_PROMPT)
 
 
+    if json_file:
+        with open(json_file, 'r') as f:
+            data = json.load(f)
+        for video in data:
+            if video in lines:
+                print(f"Video {video} already completed operation")
+                continue
+            try:
+                video_path = os.path.join(video_directory, f"{video}.mp4")
+                if not os.path.exists(video_path):
+                    write_to_check_file(check_file, 1, video)
+                    print(f"Video {video_path} does not exist")
+                    continue
+                
+                description = data[video]["description"]
+                language = data[video]["metadata"]["language"]
+                category = data[video]["event_type"]
+                
+                if category != "emergency" or language != "english":
+                    write_to_check_file(check_file, 2, video)
+                    continue
+
+                
+                video_dir = os.path.join(output_dir, video)
+                if not os.path.exists(video_dir):
+                    os.mkdir(video_dir)
+                
+                db_dir = os.path.join(video_dir, "DB")
+
+                # grab description
+                
+
+                ip = Information_processor(warnings=[], objectives="", working_dir=video_dir)
+                log.info("Information Processor loaded")
+                vqg = VideoQuestionGenerator()
+                log.info("Video Question Generator loaded")
+                rs = RAGSystem(db_dir=db_dir)
+                log.info("RAG Loaded")
+                RTP = RealTimeVideoProcess(rag_system=rs,
+                                            information_processor=ip, 
+                                            timestamp_extractor=te, 
+                                            video_question_generator=vqg, 
+                                            working_dir=video_dir,
+                                            description=description)
+                
+                
+                RTP.real_time_video_process(video_path, video_dir, description)
+                
+                
+                # 0, Success, 1 Video Doesn't exist, 2 wrong category
+                write_to_check_file(check_file, 0, video)
+                
+            except Exception as e:
+                print(f"Failed video {video} with exception: {e}")
+    else:
+        # Just process videos in dir
+        descriptions = {
+            "DOD_110792773-1920x1080-9000k": "Some damage from the Palisades Fire in 2025. Soldiers are working hand in hand with the Los Angeles Fire Department and law enforcement agencies to ensure areas are secure and only proper personnel can enter certain areas for safety reasons.",
+            "DOD_110804563-1920x1080-9000k": "BROLL Footage from Maui and Los Angeles. The U.S. Army Corp of Engineers uses the wet method to minimize the risk of ash and dust particles from entering the air during the debris removal process at residences in Los Angeles in the aftermath of the recent wildfires. This wet method process is done to protect the health and environment in the community.",
+            "DOD_110770956-1920x1080-9000k": "California Army National Guard pilots fly over Palisades on a UH-60 Black Hawk observing damage to communities caused by the wildfires at Palisades, Calif., Jan. 15, 2025. The California Army National Guard was activated to help support first responders and emergency services fighting the fires in Los Angeles County. (U.S. Army National Guard video by Spc. William Franco Espinosa)"
+        }
+        videos = os.listdir(video_dir)
+        for video in videos:
+            video_path = os.path.join(video_dir, video)
+            video_name = video[:-4]
+            if video_name in lines:
+                print(f"Video {video_name} already completed operation")
+                continue
+            try:
+                
+                description = descriptions[video_name]
+                
+                output_video_dir = os.path.join(output_dir, video_name)
+                if not os.path.exists(output_video_dir):
+                    os.mkdir(output_video_dir)
+                
+                db_dir = os.path.join(output_video_dir, "DB")
+
+                # grab description
+                
+
+                ip = Information_processor(warnings=[], objectives="", working_dir=output_video_dir)
+                log.info("Information Processor loaded")
+                vqg = VideoQuestionGenerator()
+                log.info("Video Question Generator loaded")
+                rs = RAGSystem(db_dir=db_dir)
+                log.info("RAG Loaded")
+                RTP = RealTimeVideoProcess(rag_system=rs,
+                                            information_processor=ip, 
+                                            timestamp_extractor=te, 
+                                            video_question_generator=vqg, 
+                                            working_dir=output_video_dir,
+                                            description=description)
+                
+                
+                RTP.real_time_video_process(video_path, output_video_dir, description)
+                
+                
+                # 0, Success, 1 Video Doesn't exist, 2 wrong category
+                write_to_check_file(check_file, 0, video_name)
+                
+            except Exception as e:
+                print(f"Failed video {video} with exception: {e}")
 
 
-    with open(json_file, 'r') as f:
-        data = json.load(f)
+
+if __name__ == '__main__':
+    video_directory = "/data/multivent_yt_videos/"
+    json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
+    # output_dir = "/data/multivent_processed"
+    output_dir = "/data/multivent_processed_without_delay"
+
+    video_directory = "/data/disaster_videos/"
+    output_dir = "/data/disaster_videos_processed/"
+    run_pipeline(video_directory, output_dir)
+
     
-    for video in data:
-        if video in lines:
-            print(f"Video {video} already completed operation")
-            continue
-        try:
-            video_path = os.path.join(video_directory, f"{video}.mp4")
-            if not os.path.exists(video_path):
-                write_to_check_file(check_file, 1, video)
-                print(f"Video {video_path} does not exist")
-                continue
-            
-            description = data[video]["description"]
-            language = data[video]["metadata"]["language"]
-            category = data[video]["event_type"]
-            
-            if category != "emergency" or language != "english":
-                write_to_check_file(check_file, 2, video)
-                continue
-
-            
-            video_dir = os.path.join(output_dir, video)
-            if not os.path.exists(video_dir):
-                os.mkdir(video_dir)
-            
-            db_dir = os.path.join(video_dir, "DB")
-
-            # grab description
-            
-
-            ip = Information_processor(warnings=[], objectives="", working_dir=video_dir)
-            log.info("Information Processor loaded")
-            vqg = VideoQuestionGenerator()
-            log.info("Video Question Generator loaded")
-            rs = RAGSystem(db_dir=db_dir)
-            log.info("RAG Loaded")
-            RTP = RealTimeVideoProcess(rag_system=rs,
-                                        information_processor=ip, 
-                                        timestamp_extractor=te, 
-                                        video_question_generator=vqg, 
-                                        working_dir=video_dir,
-                                        description=description)
-            
-            
-            RTP.real_time_video_process(video_path, video_dir, description)
-            
-            
-            # 0, Success, 1 Video Doesn't exist, 2 wrong category
-            write_to_check_file(check_file, 0, video)
-            
-        except Exception as e:
-            print(f"Failed video {video} with exception: {e}")
-
+    
 
 
     
