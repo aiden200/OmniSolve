@@ -84,85 +84,94 @@ def visualize_aggregated_categories(evaluation, aggregated):
 
 
 
-import matplotlib.pyplot as plt
-import numpy as np
 
-def visualize_metrics_comparison(evaluation_1, evaluation_metrics_1, evaluation_2, evaluation_metrics_2):
-    overall_metrics_1 = evaluation_metrics_1["overall_metrics"]
-    overall_metrics_2 = evaluation_metrics_2["overall_metrics"]
-    
-    # Define metric labels and corresponding values for both evaluations
+
+def visualize_metrics_comparison(evaluations, evaluation_metrics):
+    # ---------------------------
+    # Top: Overall Metrics Extraction
+    # ---------------------------
+    # Define metric labels and corresponding values for each evaluation
     labels = ["Recall", "Precision", "Avg Semantic Similarity"]
-    values_1 = [
-        overall_metrics_1["overall_recall"],
-        overall_metrics_1["overall_precision"],
-        overall_metrics_1["overall_avg_sem_sim"]
-    ]
-    values_2 = [
-        overall_metrics_2["overall_recall"],
-        overall_metrics_2["overall_precision"],
-        overall_metrics_2["overall_avg_sem_sim"]
-    ]
+    overall_metrics = []
+    values = []
+    video_metrics = []
+    for i in range(len(evaluations)):
+        overall_metrics.append(evaluation_metrics[i]["overall_metrics"])
+        values.append([
+            evaluation_metrics[i]["overall_metrics"]["overall_recall"],
+            evaluation_metrics[i]["overall_metrics"]["overall_precision"],
+            evaluation_metrics[i]["overall_metrics"]["overall_avg_sem_sim"]
+        ])
+        video_metrics.append(evaluation_metrics[i]["video_metrics"])
+        
+    # ---------------------------
+    # Overall Metrics Comparison Plot
+    # ---------------------------
+    x = np.arange(len(labels))  # Positions for labels on x-axis
+    n_evals = len(evaluations)
+    bar_width = 0.8 / n_evals  # Allocate 80% of the group width
+    offsets = [((i - (n_evals - 1) / 2) * bar_width) for i in range(n_evals)]
     
-    x = np.arange(len(labels))  # Label positions
-    width = 0.35  # Bar width
+    # Use matplotlib's default color cycle
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
     
-    # Plot overall metrics comparison
     plt.figure(figsize=(8, 6))
-    plt.bar(x - width/2, values_1, width, label=evaluation_1, color="blue")
-    plt.bar(x + width/2, values_2, width, label=evaluation_2, color="green")
+    for i in range(n_evals):
+        plt.bar(x + offsets[i], values[i], bar_width, label=evaluations[i], color=colors[i % len(colors)])
     
     plt.ylim(0, 1)
     plt.xticks(x, labels)
     plt.ylabel("Metric Value")
     plt.title("Overall Metrics Comparison")
     plt.legend()
-    plt.savefig(f'benchmark_results/{evaluation_1}_vs_{evaluation_2}_overall_metrics.png')
+    overall_filename = f'benchmark_results/{"_vs_".join(evaluations)}_overall_metrics.png'
+    plt.savefig(overall_filename)
     plt.show()
     
-    # Extract per-video metrics
-    video_metrics_1 = evaluation_metrics_1["video_metrics"]
-    video_metrics_2 = evaluation_metrics_2["video_metrics"]
+    # ---------------------------
+    # Per-Video Metrics Comparison Plot
+    # ---------------------------
+    # Assume each evaluation has the same set of video keys
+    videos = list(video_metrics[0].keys())
+    x_videos = np.arange(len(videos))  # positions for videos on x-axis
+    bar_width = 0.8 / n_evals  # same dynamic bar width
+    offsets = [((i - (n_evals - 1) / 2) * bar_width) for i in range(n_evals)]
     
-    videos = list(video_metrics_1.keys())  # Assuming same set of videos in both evaluations
-    recalls_1 = [video_metrics_1[v]["recall"] for v in videos]
-    precisions_1 = [video_metrics_1[v]["precision"] for v in videos]
-    avg_sem_sims_1 = [video_metrics_1[v]["avg_sem_sim"] for v in videos]
-    
-    recalls_2 = [video_metrics_2[v]["recall"] for v in videos]
-    precisions_2 = [video_metrics_2[v]["precision"] for v in videos]
-    avg_sem_sims_2 = [video_metrics_2[v]["avg_sem_sim"] for v in videos]
-
-    x = np.arange(len(videos))  # Video label positions
-
     plt.figure(figsize=(12, 8))
-
-    # Recall comparison
+    
+    # Recall subplot
     plt.subplot(3, 1, 1)
-    plt.bar(x - width/2, recalls_1, width, label=evaluation_1, color="blue")
-    plt.bar(x + width/2, recalls_2, width, label=evaluation_2, color="green")
+    for i in range(n_evals):
+        recalls = [video_metrics[i][v]["recall"] for v in videos]
+        plt.bar(x_videos + offsets[i], recalls, bar_width, label=evaluations[i], color=colors[i % len(colors)])
     plt.ylabel("Recall")
     plt.title("Per-Video Metrics Comparison")
-    plt.xticks(ticks=x, labels=videos, rotation=45)
+    plt.xticks(ticks=x_videos, labels=videos, rotation=45)
     plt.legend()
     
-    # Precision comparison
+    # Precision subplot
     plt.subplot(3, 1, 2)
-    plt.bar(x - width/2, precisions_1, width, color="blue")
-    plt.bar(x + width/2, precisions_2, width, color="green")
+    for i in range(n_evals):
+        precisions = [video_metrics[i][v]["precision"] for v in videos]
+        plt.bar(x_videos + offsets[i], precisions, bar_width, label=evaluations[i], color=colors[i % len(colors)])
     plt.ylabel("Precision")
-    plt.xticks(ticks=x, labels=videos, rotation=45)
-
-    # Avg Semantic Similarity comparison
+    plt.xticks(ticks=x_videos, labels=videos, rotation=45)
+    plt.legend()
+    
+    # Avg Semantic Similarity subplot
     plt.subplot(3, 1, 3)
-    plt.bar(x - width/2, avg_sem_sims_1, width, color="blue")
-    plt.bar(x + width/2, avg_sem_sims_2, width, color="green")
+    for i in range(n_evals):
+        avg_sem_sims = [video_metrics[i][v]["avg_sem_sim"] for v in videos]
+        plt.bar(x_videos + offsets[i], avg_sem_sims, bar_width, label=evaluations[i], color=colors[i % len(colors)])
     plt.ylabel("Avg Semantic Similarity")
-    plt.xticks(ticks=x, labels=videos, rotation=45)
+    plt.xticks(ticks=x_videos, labels=videos, rotation=45)
+    plt.legend()
     
     plt.tight_layout()
-    plt.savefig(f'benchmark_results/{evaluation_1}_vs_{evaluation_2}_per_video_metrics.png')
+    per_video_filename = f'benchmark_results/{"_vs_".join(evaluations)}_per_video_metrics.png'
+    plt.savefig(per_video_filename)
     plt.show()
+
 
 
 def visualize_metrics(evaluation, evaluation_metrics):

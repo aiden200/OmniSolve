@@ -390,14 +390,18 @@ def rerun_visualization(evaluation):
     visualize_aggregated_categories(evaluation, aggregated_by_category)
 
 
-def rerun_comparison_visualization(evaluation1, evaluation2):
-    with open("benchmark_results/evaluation_metrics.json", "r") as f:
-        evaluation_metrics1 = json.load(f)
+def rerun_comparison_visualization(evaluation_json_files, evaluation_names):
+    evaluations = []
+    evaluation_metrics = []
+    for i in range(len(evaluation_names)):
+        print(evaluation_json_files[i])
+        evaluations.append(evaluation_names[i])
+
+        with open(evaluation_json_files[i], "r") as f:
+            evaluation_metric = json.load(f)
+            evaluation_metrics.append(evaluation_metric)
     
-    with open("benchmark_results/omnisolve_evaluation_metrics.json", "r") as f:
-        evaluation_metrics2 = json.load(f)
-    
-    visualize_metrics_comparison(evaluation1, evaluation_metrics1, evaluation2, evaluation_metrics2)
+    visualize_metrics_comparison(evaluations, evaluation_metrics)
 
 
 # rerun_comparison_visualization("gemini", "omnisolve")
@@ -408,14 +412,31 @@ result_dir = "/data/multivent_processed/"
 multivent_g_json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
 multivent_yt_path = "/data/multivent_yt_videos/"
 # evaluation = "omnisolve"
-evaluation = "gemini_full"
+evaluation = "gemini_5"
 # evaluation_file = "benchmark_results/gemini_results.json"
-# evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omniverse_formatted.json"
-evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_full_results.json"
+# evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omnisolve_formatted.json"
+evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_5_results.json"
 threshold = .1
 
 
-evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
-aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
+# evaluation_metrics = evaluate_multivent_g(result_dir, multivent_g_json_file, multivent_yt_path, threshold, evaluation=evaluation, evaluation_file=evaluation_file, visualize=True)
+# aggregated_by_category = aggregate_per_category(evaluation_metrics["aggregated_stats"])
 # print(json.dumps(aggregated_by_category, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o))
 # rerun_visualization(evaluation)
+
+
+
+evaluation_json_files = [
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_full_evaluation_metrics.json",
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_5_evaluation_metrics.json",
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/evaluation_metrics.json",
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omnisolve_evaluation_metrics.json"
+]
+
+evaluation_names = [
+    "Gemini - Entire Video",
+    "Gemini - 5 second context",
+    "Gemini - Exact Frame",
+    "Ours"
+]
+rerun_comparison_visualization(evaluation_json_files, evaluation_names)
