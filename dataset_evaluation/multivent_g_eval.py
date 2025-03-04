@@ -18,7 +18,7 @@ def compute_iou(bbox1, bbox2, evaluation):
     Each bbox is a list in the form [x1, y1, x2, y2].
     """
 
-    if evaluation == "gemini":
+    if "gemini" in evaluation:
         # Some reason Gemini normalizes by 10 times more
         bbox2[0] = bbox2[0] / 10 
         bbox2[1] = bbox2[1] / 10 
@@ -184,7 +184,7 @@ def evaluate_multivent_g(result_dir,
     # videos = ["EDLy6c3jH8U"]
 
     # Load evaluation results 
-    if evaluation == "gemini" or evaluation == "omnisolve":
+    if "gemini" in evaluation or evaluation == "omnisolve":
         with open(evaluation_file, "r") as f:
             predictions = json.load(f)
         
@@ -390,14 +390,28 @@ def rerun_visualization(evaluation):
     visualize_aggregated_categories(evaluation, aggregated_by_category)
 
 
+def rerun_comparison_visualization(evaluation1, evaluation2):
+    with open("benchmark_results/evaluation_metrics.json", "r") as f:
+        evaluation_metrics1 = json.load(f)
+    
+    with open("benchmark_results/omnisolve_evaluation_metrics.json", "r") as f:
+        evaluation_metrics2 = json.load(f)
+    
+    visualize_metrics_comparison(evaluation1, evaluation_metrics1, evaluation2, evaluation_metrics2)
+
+
+# rerun_comparison_visualization("gemini", "omnisolve")
+# exit(0)
 
 
 result_dir = "/data/multivent_processed/"
 multivent_g_json_file = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
 multivent_yt_path = "/data/multivent_yt_videos/"
-evaluation = "omnisolve"
+# evaluation = "omnisolve"
+evaluation = "gemini_full"
 # evaluation_file = "benchmark_results/gemini_results.json"
-evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omniverse_formatted.json"
+# evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omniverse_formatted.json"
+evaluation_file = "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_full_results.json"
 threshold = .1
 
 

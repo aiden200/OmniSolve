@@ -6,6 +6,13 @@ import os
 import time
 import json 
 from tqdm import tqdm
+from langchain_community.document_loaders import TextLoader
+from langchain_core.documents import Document
+from langchain_neo4j import Neo4jVector
+from langchain_openai import OpenAIEmbeddings
+from langchain_text_splitters import CharacterTextSplitter
+from langchain_huggingface import HuggingFaceEmbeddings
+
 load_dotenv()
 
 
@@ -23,6 +30,99 @@ def extract_json_between_markers(text, start_marker="```json", end_marker="```")
         except ValueError:
             print("Markers not found in the text.")
             return None
+
+
+class RelationshipExtractor:
+    def __init__(self):
+        model_name = "sentence-transformers/all-mpnet-base-v2"
+        model_kwargs = {'device': 'cpu'}
+        encode_kwargs = {'normalize_embeddings': False}
+        self.hf_embeddings = HuggingFaceEmbeddings(
+            model_name=model_name,
+            model_kwargs=model_kwargs,
+            encode_kwargs=encode_kwargs
+        )
+
+        self.url = os.environ["NEO4J_URI"]
+        self.username = os.environ["NEO4J_USERNAME"]
+        self.password = os.environ["NEO4J_PASSWORD"]
+
+
+    def build_relationships(self, relationships, video, subclip_id, start, end, existing=False):
+
+        docs = []
+        for rel in relationships:
+            # Assume each of object1 and object2 are lists; take first element as the representative name.
+            obj1 = rel.get("object1", [""])[0]
+            rel_type = rel.get("relationship", "")
+            obj2 = rel.get("object2", [""])[0]
+            # Create a human-readable description of the relationship.
+            description = f"{obj1} {rel_type} {obj2}"
+            # Include temporal metadata (e.g., the subclip identifier).
+            # metadata = {"subclip_id": subclip_id}
+            metadata = {"subclip_id": subclip_id, "start_time": start, "end_time": end}
+            doc = Document(page_content=description, metadata=metadata)
+            docs.append(doc)
+
+        index_name = f"{video}_relationships_{subclip_id}"
+
+        if existing:
+            store = Neo4jVector.from_existing_index(
+                self.hf_embeddings,
+                url=self.url,
+                username=self.username,
+                password=self.password,
+                index_name=index_name,
+            )
+        else:
+            store = Neo4jVector.from_documents(
+                docs, 
+                self.hf_embeddings, 
+                url=self.url, 
+                username=self.username, 
+                password=self.password,
+                index_name=index_name
+            )
+        print(f"Stored {len(docs)} relationship documents in index '{index_name}'.")
+        return store
+
+
+    def query_hybrid_system(query_text, query_start_time, query_end_time, index_name):
+        # Step 1: Semantic Query on the Vector Database
+        # (Assume vector_db.search returns a list of subclip metadata with subclip_id, start_time, end_time)
+        candidate_subclips = vector_db.search(query_text)
+        
+        # Filter by time overlap (if vector DB doesn’t already do this)
+        candidate_subclip_ids = []
+        for subclip in candidate_subclips:
+            if subclip['start_time'] <= query_end_time and subclip['end_time'] >= query_start_time:
+                candidate_subclip_ids.append(subclip['subclip_id'])
+        
+        # Step 2: Temporal Query on the KG
+        # Compose a Cypher query with time and candidate subclip filtering.
+        cypher_query = """
+        MATCH (a)-[r]->(b)
+        WHERE r.subclip_id IN $candidate_ids
+        AND r.start_time <= $query_end_time
+        AND r.end_time >= $query_start_time
+        // Optionally add semantic conditions:
+        AND (a.name CONTAINS $keyword OR b.name CONTAINS $keyword)
+        RETURN a, r, b
+        """
+        # You could extract keywords from the query_text; for simplicity, we pass one keyword here.
+        params = {
+            "candidate_ids": candidate_subclip_ids,
+            "query_start_time": query_start_time,
+            "query_end_time": query_end_time,
+            "keyword": "fireman"  # or extract dynamically from query_text
+        }
+        kg_results = neo4j_driver.run(cypher_query, params)
+
+        # Combine and rank results as needed
+        final_results = process_results(candidate_subclips, kg_results)
+        return final_results
+
+
 
 def extract_relationship_for_video(video_folder, client, prompt, debug=False):
 

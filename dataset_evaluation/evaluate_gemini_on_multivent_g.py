@@ -4,6 +4,7 @@ import os
 from PIL import Image
 from google.genai import types
 from io import BytesIO
+import time
 
 
 load_dotenv()
@@ -17,6 +18,7 @@ from PIL import ImageColor
 import numpy as np
 from collections import defaultdict
 from tqdm import tqdm
+import random
 
 import cv2
 
@@ -112,7 +114,19 @@ def show_frame_with_detection(video_path, detection):
     cv2.destroyAllWindows()
 
 
+def upload_video_to_google(video_file_path, client):
 
+    video_file = client.files.upload(file=video_file_path)
+    while video_file.state.name == "PROCESSING":
+        print('.', end='')
+        time.sleep(1)
+        video_file = client.files.get(name=video_file.name)
+    
+
+    if video_file.state.name == "FAILED":
+        raise ValueError(video_file.state.name)
+
+    return video_file
 
 
 additional_colors = [colorname for (colorname, colorcode) in ImageColor.colormap.items()]
@@ -244,7 +258,7 @@ def plot_bounding_boxes(im, bounding_boxes):
 
 
 
-def test_gemini(multivent_yt_path, multivent_g_results_path, multivent_g_json_path, results_file="benchmark_results/gemini_results.json"):
+def test_gemini_frame(multivent_yt_path, multivent_g_results_path, multivent_g_json_path, results_file="benchmark_results/gemini_results.json"):
 
     client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
 
@@ -329,7 +343,170 @@ def test_gemini(multivent_yt_path, multivent_g_results_path, multivent_g_json_pa
             json.dump(results, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
 
 
+def get_timestamp_from_frame(video_path, frame_number):
+    # return timestamp from frame
 
+    cap = cv2.VideoCapture(video_path)
+    curr_frame_num = 0
+    while (cap.isOpened()):
+        frame_exists, curr_frame = cap.read()
+        if frame_exists:
+            if curr_frame_num == frame_number:
+                timestamp = cap.get(cv2.CAP_PROP_POS_MSEC)
+                hours = int(timestamp // (1000 * 60 * 60))
+                minutes = int((timestamp % (1000 * 60 * 60)) // (1000 * 60))
+                seconds = int((timestamp % (1000 * 60)) // 1000)
+
+                # Format as HH:MM:SS
+                timestamp_str = f"{hours:02}:{minutes:02}:{seconds:02}"
+                return timestamp_str
+        else:
+            raise ValueError(f"Video {video_path} does not have frame {frame_number}. Curr frame number: {curr_frame_num}")
+        curr_frame_num += 1
+
+
+    return timestamp
+
+from moviepy.video.io.ffmpeg_tools import ffmpeg_extract_subclip
+
+def modify_video_based_on_duration(video_path, frame_number, modified_video_folder, duration):
+
+    duration = int(duration)
+    cap = cv2.VideoCapture(video_path)
+    if not cap.isOpened():
+        raise ValueError("Could not open video file.")
+    
+
+    total_frames = cap.get(cv2.CAP_PROP_FRAME_COUNT)
+    fps = cap.get(cv2.CAP_PROP_FPS)
+    video_duration = total_frames / fps
+
+    if frame_number < 0 or frame_number >= total_frames:
+        raise ValueError("Frame number is out of range.")
+
+    # Get the timestamp of the target frame
+    cap.set(cv2.CAP_PROP_POS_FRAMES, frame_number)
+    frame_timestamp = frame_number / fps
+    cap.release()
+
+    # Randomly distribute time around the frame
+    max_left_duration = min(frame_timestamp, duration / 2)  # we don't go below 0
+    max_right_duration = min(video_duration - frame_timestamp, duration / 2)  # Ensure we don't exceed video length
+
+
+    # Add a small random variation to the duration
+    left_duration = max_left_duration * random.uniform(0.7, 1.0)  # Randomly choose 70% - 100% of max_left
+    right_duration = max_right_duration * random.uniform(0.7, 1.0)  # Randomly choose 70% - 100% of max_right
+
+    # Adjust durations to fit within the total duration constraint
+    if left_duration + right_duration > duration:
+        scale_factor = duration / (left_duration + right_duration)
+        left_duration *= scale_factor
+        right_duration *= scale_factor
+
+    # Compute new start and end times
+    start_time = max(0, frame_timestamp - left_duration)
+    end_time = min(video_duration, frame_timestamp + right_duration)
+
+    os.makedirs(modified_video_folder, exist_ok=True)
+
+    modified_video_path = os.path.join(modified_video_folder, f"{str(duration)}_{os.path.basename(video_path)}")
+    ffmpeg_extract_subclip(video_path, start_time, end_time, targetname=modified_video_path)
+    new_timestamp = frame_timestamp - start_time
+
+    hours = int(new_timestamp // (60 * 60))
+    minutes = int((new_timestamp % (60 * 60)) // 60)
+    seconds = int(new_timestamp % 60)
+
+    # Format as HH:MM:SS
+    timestamp_str = f"{hours:02}:{minutes:02}:{seconds:02}"
+
+    return timestamp_str, modified_video_path
+
+
+def test_gemini_video(multivent_yt_path, multivent_g_results_path, multivent_g_json_path, duration, modified_video_folder):
+
+    client = genai.Client(api_key=os.getenv("GOOGLE_API_KEY"))
+
+
+    bounding_box_system_instructions = """
+    Return bounding boxes as a JSON array with labels. Never return masks or code fencing. Limit to 25 objects.
+    If an object is present multiple times, name them according to their unique characteristic (colors, size, position, unique characteristics, etc..).
+    The output json should follow the following format:
+[
+  {
+    "label": [LABEL1],
+    "bbox": [
+        
+    ]
+  },
+  {
+    "label": [LABEL2],
+    "bbox": [
+
+    ]
+  }, ...
+]
+      """
+
+    if not os.path.exists(modified_video_folder):
+        os.mkdir(modified_video_folder)
+
+    results_file=f"benchmark_results/gemini_{duration}_results.json"
+
+
+    with open(multivent_g_json_path, "r") as f:
+        multivent_g_ground_truth = json.load(f)
+
+    videos = [name for name in os.listdir(multivent_g_results_path) if os.path.isdir(os.path.join(multivent_g_results_path, name))]
+    
+    if os.path.exists(results_file):
+        with open(results_file, "r") as f:
+            results = json.load(f)
+    else:
+        results = defaultdict(list)
+    for video in tqdm(videos):
+        if video in results:
+            continue
+        video_path = os.path.join(multivent_yt_path, f"{video}.mp4")
+
+        finished_frames = []
+        mvg_gt = multivent_g_ground_truth[video]["spatial"]
+
+        for object in mvg_gt:
+            frame_number = object["frame"]
+            if frame_number not in finished_frames:
+                try:
+                    timestamp = get_timestamp_from_frame(video_path, frame_number)
+                    
+                    if duration != "full":
+                        timestamp, modified_video_path = modify_video_based_on_duration(video_path, frame_number, modified_video_folder, duration)
+                    else:
+                        # Taking in the full video
+                        modified_video_path = video_path
+
+                    video_file = upload_video_to_google(modified_video_path, client)
+                    prompt = f"Detect the 2d bounding boxes at {timestamp}"  # HH:MM:SS
+                    response = client.models.generate_content(
+                        model='gemini-1.5-flash-latest',
+                        contents=[video_file, prompt],
+                        config = types.GenerateContentConfig(
+                            system_instruction=bounding_box_system_instructions,
+                            temperature=0.1,
+                            # safety_settings=safety_settings,
+                        )
+                    )
+
+                    objects = convert_coords_back(response.text, frame_number)
+                    if video not in results:
+                        results[video] = []
+                    results[video] += objects
+                    finished_frames.append(frame_number)
+                except Exception as e:
+                    print(e)
+    
+        with open(results_file, "w") as f:
+            json.dump(results, f, indent=2, default=lambda o: round(float(o), 3) if isinstance(o, np.floating) else o)
 
 
 
@@ -337,4 +514,9 @@ multivent_yt_path = "/data/multivent_yt_videos/"
 multivent_g_results_path = "/data/multivent_processed/"
 multivent_g_json_path = "/home/aiden/Documents/cs/multiVENT/data/multivent_g.json"
 
-test_gemini(multivent_yt_path, multivent_g_results_path, multivent_g_json_path)
+# test_gemini_frame(multivent_yt_path, multivent_g_results_path, multivent_g_json_path)
+
+duration = "full"
+duration = "5"
+modified_video_folder = "/data/modified_multivent_videos"
+test_gemini_video(multivent_yt_path, multivent_g_results_path, multivent_g_json_path, duration, modified_video_folder)
