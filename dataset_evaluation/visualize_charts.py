@@ -1,5 +1,6 @@
 import matplotlib.pyplot as plt
 import numpy as np
+import os
 
 def visualize_continuous_category(evaluation, category_name, data):
     """
@@ -82,6 +83,49 @@ def visualize_aggregated_categories(evaluation, aggregated):
         else:
             visualize_continuous_category(evaluation, category, data)
 
+
+import os
+import numpy as np
+import matplotlib.pyplot as plt
+
+def visualize_category_metrics_comparison(evaluations, category_metrics):
+    roles = ["emergency-response", "outcome-occurred", "what", "when", "where", "who-affected"]
+    metric_keys = ["avg_precision", "avg_recall", "avg_sem_sim"]
+    metric_names = {"avg_precision": "Precision", "avg_recall": "Recall", "avg_sem_sim": "Semantic Similarity"}
+    
+    n_roles = len(roles)
+    n_evals = len(evaluations)
+    
+    # Use matplotlib's default color cycle for consistency across plots
+    colors = plt.rcParams['axes.prop_cycle'].by_key()['color']
+    
+    # Loop through each metric to create a separate plot.
+    for metric in metric_keys:
+        plt.figure(figsize=(8, 6))
+        # x positions: one per role
+        x = np.arange(n_roles)
+        # Determine bar width based on number of evaluations.
+        bar_width = 0.8 / n_evals
+        # Calculate horizontal offsets for each evaluation's bars.
+        offsets = [((i - (n_evals - 1) / 2) * bar_width) for i in range(n_evals)]
+        
+        # Plot bars for each evaluation.
+        for i in range(n_evals):
+            # Extract the metric values for each role in the given evaluation.
+            values = [category_metrics[i]["role"][role][metric] for role in roles]
+            plt.bar(x + offsets[i], values, bar_width, label=evaluations[i], color=colors[i % len(colors)])
+        
+        plt.xticks(x, roles, rotation=45)
+        plt.ylabel("Metric Value")
+        plt.ylim(0, 1)
+        plt.title(f"Overall Category {metric_names[metric]} Comparison")
+        plt.legend()
+        
+        # Save the figure
+        filename = f'benchmark_results/category_{"_vs_".join(evaluations)}_overall_{metric}.png'
+        os.makedirs(os.path.dirname(filename), exist_ok=True)
+        plt.savefig(filename)
+        plt.show()
 
 
 

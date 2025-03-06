@@ -390,7 +390,7 @@ def rerun_visualization(evaluation):
     visualize_aggregated_categories(evaluation, aggregated_by_category)
 
 
-def rerun_comparison_visualization(evaluation_json_files, evaluation_names):
+def rerun_comparison_visualization(evaluation_json_files, evaluation_names, category_json_files):
     evaluations = []
     evaluation_metrics = []
     for i in range(len(evaluation_names)):
@@ -402,6 +402,18 @@ def rerun_comparison_visualization(evaluation_json_files, evaluation_names):
             evaluation_metrics.append(evaluation_metric)
     
     visualize_metrics_comparison(evaluations, evaluation_metrics)
+
+
+    evaluations = []
+    category_metrics = []
+    for i in range(len(evaluation_names)):
+        evaluations.append(evaluation_names[i])
+
+        with open(category_json_files[i], "r") as f:
+            category_metric = json.load(f)
+            category_metrics.append(category_metric)
+    
+    visualize_category_metrics_comparison(evaluations, category_metrics)
 
 
 # rerun_comparison_visualization("gemini", "omnisolve")
@@ -433,10 +445,17 @@ evaluation_json_files = [
     "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omnisolve_evaluation_metrics.json"
 ]
 
+category_json_files = [
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_full_category_evaluation.json",
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/gemini_5_category_evaluation.json",
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/category_evaluation.json",
+    "/home/aiden/Documents/cs/OmniSolve/benchmark_results/omnisolve_category_evaluation.json"
+]
+
 evaluation_names = [
     "Gemini - Entire Video",
     "Gemini - 5 second context",
     "Gemini - Exact Frame",
     "Ours"
 ]
-rerun_comparison_visualization(evaluation_json_files, evaluation_names)
+rerun_comparison_visualization(evaluation_json_files, evaluation_names, category_json_files)
